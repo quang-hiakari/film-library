@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../layouts/base-layout.astro";
+import AlbumCard from "../components/album-card.astro";
+import { getAllAlbums, type Album } from "../lib/album-service";
+import { getDb } from "../lib/db";
+
+export const prerender = false;
+
+const env = Astro.locals.runtime?.env;
+const user = Astro.locals.user;
+
+let albums: Album[] = [];
+let fetchError = false;
+
+if (env?.R2 && env?.DB) {
+  try {
+    const db = getDb(env.DB);
+    albums = await getAllAlbums(env as any, db, user);
+  } catch (err) {
+    console.error("Failed to load albums:", err);
+    fetchError = true;
+  }
+} else {
+  fetchError = true;
+}
+---
+
+<BaseLayout>
+  {albums.length > 0 ? (
+    <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      {albums.map((album) => (
+        <AlbumCard
+          slug={album.slug}
+          title={album.title}
+          date={album.date}
+          filmStock={album.filmStock}
+          coverUrl={album.coverUrl}
+          visibility={album.visibility}
+        />
+      ))}
+    </div>
+  ) : (
+    <div class="py-20 text-center">
+      <p class="text-gray-400">
+        {fetchError
+          ? "Storage not configured. Run via `wrangler pages dev` for local bindings."
+          : user
+          ? "No albums visible to you yet."
+          : "No public albums yet. Log in to see more."}
+      </p>
+    </div>
+  )}
+</BaseLayout>

@@ -1,0 +1,25 @@
+---
+interface Props {
+  photos: string[];
+}
+
+const { photos } = Astro.props;
+---
+
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {photos.map((url, i) => (
+    <button
+      class="photo-thumb cursor-zoom-in overflow-hidden rounded-lg bg-gray-100"
+      data-index={i}
+      style="aspect-ratio: 3/2;"
+    >
+      <img
+        src={url}
+        alt={`Photo ${i + 1}`}
+        loading="lazy"
+        decoding="async"
+        class="h-full w-full object-cover"
+      />
+    </button>
+  ))}
+</div>

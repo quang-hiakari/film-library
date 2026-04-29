@@ -1,0 +1,123 @@
+---
+import BaseLayout from "../../../layouts/base-layout.astro";
+import { getDb } from "../../../lib/db";
+import { rolls, rollAccess, user as userTable } from "../../../lib/db-schema";
+import { eq } from "drizzle-orm";
+
+export const prerender = false;
+
+const currentUser = Astro.locals.user;
+if (!currentUser || currentUser.role !== "admin") return Astro.redirect("/");
+
+const { slug } = Astro.params;
+if (!slug) return Astro.redirect("/admin");
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env.DB);
+
+// Get roll visibility
+const rollRow = await db.select().from(rolls).where(eq(rolls.slug, slug)).limit(1);
+const visibility = rollRow[0]?.visibility ?? "registered";
+
+// Get invited users for private rolls
+const grants = await db
+  .select({ userId: rollAccess.userId, name: userTable.name, email: userTable.email })
+  .from(rollAccess)
+  .innerJoin(userTable, eq(rollAccess.userId, userTable.id))
+  .where(eq(rollAccess.rollSlug, slug));
+---
+
+<BaseLayout title={`Admin: ${slug} — Film Library`}>
+  <div class="mb-6">
+    <a href="/admin" class="text-sm text-gray-400 hover:text-gray-600">&larr; Back to admin</a>
+  </div>
+
+  <h2 class="mb-2 text-xl font-light text-gray-900">{slug}</h2>
+  <p class="mb-8 text-sm text-gray-500">
+    Current visibility: <strong class="text-gray-700">{visibility}</strong>
+  </p>
+
+  <section>
+    <h3 class="mb-4 text-base font-medium text-gray-900">User Access (Private Rolls)</h3>
+
+    {grants.length > 0 ? (
+      <ul class="mb-6 space-y-2">
+        {grants.map((g) => (
+          <li class="flex items-center justify-between rounded border border-gray-100 px-4 py-2 text-sm">
+            <span>{g.name} ({g.email})</span>
+            <button
+              class="remove-btn text-red-500 hover:text-red-700"
+              data-email={g.email}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="mb-6 text-sm text-gray-400">No users invited yet.</p>
+    )}
+
+    <form id="invite-form" class="flex gap-3">
+      <input
+        id="invite-email"
+        type="email"
+        required
+        placeholder="user@example.com"
+        class="flex-1 rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+      />
+      <button
+        type="submit"
+        class="rounded bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
+      >
+        Invite
+      </button>
+    </form>
+    <p id="invite-msg" class="mt-2 hidden text-sm"></p>
+  </section>
+
+  <script define:vars={{ slug }}>
+    const msg = document.getElementById("invite-msg");
+
+    function showMsg(text, isError) {
+      msg.textContent = text;
+      msg.className = `mt-2 text-sm ${isError ? "text-red-600" : "text-green-600"}`;
+      msg.classList.remove("hidden");
+      setTimeout(() => msg.classList.add("hidden"), 3000);
+    }
+
+    async function callApi(email, action) {
+      return fetch("/api/admin/roll-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rollSlug: slug, userEmail: email, action }),
+      });
+    }
+
+    document.getElementById("invite-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("invite-email").value;
+      const res = await callApi(email, "add");
+      if (res.ok) {
+        showMsg(`Invited ${email}`, false);
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showMsg(data.error || "Failed to invite", true);
+      }
+    });
+
+    document.querySelectorAll(".remove-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const email = btn.dataset.email;
+        const res = await callApi(email, "remove");
+        if (res.ok) {
+          showMsg(`Removed ${email}`, false);
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showMsg("Failed to remove", true);
+        }
+      });
+    });
+  </script>
+</BaseLayout>

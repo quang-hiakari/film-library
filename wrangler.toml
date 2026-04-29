@@ -1,0 +1,13 @@
+name = "film-library"
+compatibility_date = "2026-03-30"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "film-library"
+database_id = "826cf34a-ba21-458b-93cb-0c2d8a5eb1b4"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "film-library"

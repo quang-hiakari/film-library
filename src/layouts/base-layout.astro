@@ -1,0 +1,81 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Film Library",
+  description = "A personal film photography collection",
+} = Astro.props;
+
+const user = Astro.locals.user;
+const isAdmin = user?.role === "admin";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-white">
+    <header class="border-b border-gray-100 px-6 py-6">
+      <div class="mx-auto flex max-w-6xl items-center justify-between">
+        <a href="/" class="text-xl font-light tracking-wide text-gray-900">
+          Film Library
+        </a>
+        <nav class="flex items-center gap-5 text-sm">
+          {user ? (
+            <>
+              <span class="text-gray-500">{user.name}</span>
+              {isAdmin && (
+                <a href="/admin" class="text-gray-700 hover:text-gray-900">
+                  Admin
+                </a>
+              )}
+              <button
+                id="logout-btn"
+                class="text-gray-700 hover:text-gray-900"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <a href="/login" class="text-gray-700 hover:text-gray-900">
+                Log in
+              </a>
+              <a
+                href="/register"
+                class="rounded bg-gray-900 px-3 py-1.5 text-white hover:bg-gray-700"
+              >
+                Register
+              </a>
+            </>
+          )}
+        </nav>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-6xl px-6 py-8">
+      <slot />
+    </main>
+
+    <footer class="border-t border-gray-100 px-6 py-6 text-center text-sm text-gray-400">
+      &copy; {new Date().getFullYear()} Film Library
+    </footer>
+
+    {user && (
+      <script>
+        import { authClient } from "../lib/auth-client";
+        document.getElementById("logout-btn")?.addEventListener("click", async () => {
+          await authClient.signOut();
+          window.location.href = "/";
+        });
+      </script>
+    )}
+  </body>
+</html>

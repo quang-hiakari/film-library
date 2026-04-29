@@ -1,34 +1,36 @@
 {
   "name": "film-library",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "@testing-library/jest-dom": "^4.2.4",
-    "@testing-library/react": "^9.4.0",
-    "@testing-library/user-event": "^7.2.1",
-    "react": "^16.12.0",
-    "react-dom": "^16.12.0",
-    "react-scripts": "3.3.1"
-  },
+  "version": "1.0.0",
+  "description": "Personal film photography library",
+  "type": "module",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
   },
-  "eslintConfig": {
-    "extends": "react-app"
+  "repository": {
+    "type": "git",
+    "url": "git@github.com-quangnm:quang-hiakari/film-library.git"
   },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@astrojs/check": "^0.9.8",
+    "@astrojs/tailwind": "^5.1.5",
+    "@aws-sdk/client-s3": "^3.1016.0",
+    "astro": "^5.18.1",
+    "aws4fetch": "^1.0.20",
+    "better-auth": "^1.6.2",
+    "drizzle-orm": "^0.45.2",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@astrojs/cloudflare": "^12.6.13",
+    "dotenv": "^17.3.1",
+    "drizzle-kit": "^0.31.10",
+    "wrangler": "^4.81.1"
   }
 }

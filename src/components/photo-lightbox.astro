@@ -1,0 +1,63 @@
+---
+interface Props {
+  photos: string[];
+}
+
+const { photos } = Astro.props;
+---
+
+<div
+  id="lightbox"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/90"
+>
+  <button id="lb-close" class="absolute right-4 top-4 text-3xl text-white/70 hover:text-white">&times;</button>
+  <button id="lb-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-4xl text-white/70 hover:text-white">&lsaquo;</button>
+  <button id="lb-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-4xl text-white/70 hover:text-white">&rsaquo;</button>
+  <img id="lb-img" class="max-h-[90vh] max-w-[90vw] object-contain" />
+  <span id="lb-counter" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/60"></span>
+</div>
+
+<script define:vars={{ photos }}>
+  const lb = document.getElementById("lightbox");
+  const img = document.getElementById("lb-img");
+  const counter = document.getElementById("lb-counter");
+  let current = 0;
+  let startX = 0;
+
+  function show(i) {
+    current = ((i % photos.length) + photos.length) % photos.length;
+    img.src = photos[current];
+    counter.textContent = `${current + 1} / ${photos.length}`;
+    lb.classList.remove("hidden");
+    lb.classList.add("flex");
+  }
+
+  function hide() {
+    lb.classList.add("hidden");
+    lb.classList.remove("flex");
+  }
+
+  document.querySelectorAll(".photo-thumb").forEach((btn) => {
+    btn.addEventListener("click", () => show(Number(btn.dataset.index)));
+  });
+
+  document.getElementById("lb-close").addEventListener("click", hide);
+  document.getElementById("lb-prev").addEventListener("click", () => show(current - 1));
+  document.getElementById("lb-next").addEventListener("click", () => show(current + 1));
+
+  lb.addEventListener("click", (e) => { if (e.target === lb) hide(); });
+
+  document.addEventListener("keydown", (e) => {
+    if (lb.classList.contains("hidden")) return;
+    if (e.key === "Escape") hide();
+    if (e.key === "ArrowLeft") show(current - 1);
+    if (e.key === "ArrowRight") show(current + 1);
+  });
+
+  // Touch swipe
+  lb.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; });
+  lb.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) show(current + (dx < 0 ? 1 : -1));
+  });
+</script>

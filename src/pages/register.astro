@@ -1,0 +1,103 @@
+---
+import BaseLayout from "../layouts/base-layout.astro";
+
+export const prerender = false;
+
+if (Astro.locals.user) {
+  return Astro.redirect("/");
+}
+---
+
+<BaseLayout title="Register — Film Library">
+  <div class="mx-auto max-w-sm py-12">
+    <h2 class="mb-8 text-center text-xl font-light text-gray-900">Create account</h2>
+
+    <form id="register-form" class="space-y-4">
+      <div>
+        <label for="name" class="block text-sm text-gray-600">Name</label>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          required
+          class="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="email" class="block text-sm text-gray-600">Email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          class="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="password" class="block text-sm text-gray-600">Password (min 8)</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          minlength="8"
+          class="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="confirm" class="block text-sm text-gray-600">Confirm password</label>
+        <input
+          id="confirm"
+          name="confirm"
+          type="password"
+          required
+          minlength="8"
+          class="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+        />
+      </div>
+      <p id="error" class="hidden text-sm text-red-600"></p>
+      <button
+        type="submit"
+        class="w-full rounded bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-700"
+      >
+        Register
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-gray-500">
+      Already have an account?
+      <a href="/login" class="text-gray-900 underline">Log in</a>
+    </p>
+  </div>
+
+  <script>
+    import { authClient } from "../lib/auth-client";
+
+    const form = document.getElementById("register-form") as HTMLFormElement;
+    const errorEl = document.getElementById("error") as HTMLParagraphElement;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.classList.add("hidden");
+      const data = new FormData(form);
+      const password = data.get("password") as string;
+      const confirm = data.get("confirm") as string;
+      if (password !== confirm) {
+        errorEl.textContent = "Passwords do not match";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+      const { error } = await authClient.signUp.email({
+        name: data.get("name") as string,
+        email: data.get("email") as string,
+        password,
+      });
+      if (error) {
+        errorEl.textContent = error.message ?? "Registration failed";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+      window.location.href = "/";
+    });
+  </script>
+</BaseLayout>
