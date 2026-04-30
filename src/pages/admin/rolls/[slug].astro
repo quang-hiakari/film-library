@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../../../layouts/base-layout.astro";
 import { getDb } from "../../../lib/db";
-import { rolls, rollAccess, user as userTable } from "../../../lib/db-schema";
+import { groups, rollAccess, rollGroupAccess, rolls, user as userTable } from "../../../lib/db-schema";
 import { eq } from "drizzle-orm";
 
 export const prerender = false;
@@ -12,17 +12,22 @@ if (!currentUser || currentUser.role !== "admin") return Astro.redirect("/");
 const { slug } = Astro.params;
 if (!slug) return Astro.redirect("/admin");
 
-const env = Astro.locals.runtime.env;
-const db = getDb(env.DB);
+const db = getDb(Astro.locals.runtime.env.DB);
 
-const rollRow = await db.select().from(rolls).where(eq(rolls.slug, slug)).limit(1);
+const [rollRow, grants, allGroups, groupGrants] = await Promise.all([
+  db.select().from(rolls).where(eq(rolls.slug, slug)).limit(1),
+  db.select({ userId: rollAccess.userId, name: userTable.name, email: userTable.email })
+    .from(rollAccess).innerJoin(userTable, eq(rollAccess.userId, userTable.id))
+    .where(eq(rollAccess.rollSlug, slug)),
+  db.select({ id: groups.id, name: groups.name }).from(groups).orderBy(groups.name),
+  db.select({ id: groups.id, name: groups.name })
+    .from(rollGroupAccess).innerJoin(groups, eq(groups.id, rollGroupAccess.groupId))
+    .where(eq(rollGroupAccess.rollSlug, slug)),
+]);
+
 const visibility = rollRow[0]?.visibility ?? "registered";
-
-const grants = await db
-  .select({ userId: rollAccess.userId, name: userTable.name, email: userTable.email })
-  .from(rollAccess)
-  .innerJoin(userTable, eq(rollAccess.userId, userTable.id))
-  .where(eq(rollAccess.rollSlug, slug));
+const grantedGroupIds = new Set(groupGrants.map((g) => g.id));
+const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
 ---
 
 <BaseLayout title={`Admin: ${slug} — Film Library`}>
@@ -39,7 +44,7 @@ const grants = await db
     </p>
   </header>
 
-  <section>
+  <section class="mb-12">
     <h3 class="mb-5 text-xs tracking-widest uppercase text-film-muted">User Access</h3>
 
     {grants.length > 0 ? (
@@ -48,12 +53,9 @@ const grants = await db
           <li class="flex items-center justify-between rounded-sm border border-film-border bg-film-surface px-4 py-3 text-sm">
             <span class="text-film-text">
               {g.name}
-              <span class="ml-2 text-film-muted text-xs">{g.email}</span>
+              <span class="ml-2 text-xs text-film-muted">{g.email}</span>
             </span>
-            <button
-              class="remove-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150"
-              data-email={g.email}
-            >
+            <button class="remove-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150" data-email={g.email}>
               Remove
             </button>
           </li>
@@ -64,21 +66,47 @@ const grants = await db
     )}
 
     <form id="invite-form" class="flex gap-3">
-      <input
-        id="invite-email"
-        type="email"
-        required
-        placeholder="user@example.com"
+      <input id="invite-email" type="email" required placeholder="user@example.com"
         class="flex-1 rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
       />
-      <button
-        type="submit"
-        class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200"
-      >
+      <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">
         Invite
       </button>
     </form>
     <p id="invite-msg" class="mt-2 hidden text-xs"></p>
+  </section>
+
+  <section>
+    <h3 class="mb-5 text-xs tracking-widest uppercase text-film-muted">Group Access</h3>
+
+    {groupGrants.length > 0 ? (
+      <ul class="mb-6 space-y-2">
+        {groupGrants.map((g) => (
+          <li class="flex items-center justify-between rounded-sm border border-film-border bg-film-surface px-4 py-3 text-sm">
+            <span class="text-film-text">{g.name}</span>
+            <button class="remove-group-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150" data-group-id={g.id}>
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="mb-6 font-serif text-lg italic text-film-faint">No groups invited yet.</p>
+    )}
+
+    {availableGroups.length > 0 && (
+      <form id="invite-group-form" class="flex gap-3">
+        <select id="invite-group-select" class="flex-1 max-w-xs cursor-pointer rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text focus:border-film-amber/50 focus:outline-none">
+          {availableGroups.map((g) => <option value={g.id}>{g.name}</option>)}
+        </select>
+        <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">
+          Invite Group
+        </button>
+      </form>
+    )}
+    {allGroups.length === 0 && (
+      <p class="text-xs text-film-faint">No groups exist yet. <a href="/admin/groups" class="text-film-amber hover:underline">Create one</a>.</p>
+    )}
   </section>
 
   <script define:vars={{ slug }}>
@@ -91,7 +119,7 @@ const grants = await db
       setTimeout(() => msg.classList.add("hidden"), 3000);
     }
 
-    async function callApi(email, action) {
+    async function callUserApi(email, action) {
       return fetch("/api/admin/roll-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,29 +127,43 @@ const grants = await db
       });
     }
 
-    document.getElementById("invite-form").addEventListener("submit", async (e) => {
+    async function callGroupApi(groupId, action) {
+      return fetch("/api/admin/roll-group-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rollSlug: slug, groupId, action }),
+      });
+    }
+
+    document.getElementById("invite-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("invite-email").value;
-      const res = await callApi(email, "add");
-      if (res.ok) {
-        showMsg(`Invited ${email}`, false);
-        setTimeout(() => location.reload(), 1000);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        showMsg(data.error || "Failed to invite", true);
-      }
+      const res = await callUserApi(email, "add");
+      if (res.ok) { showMsg(`Invited ${email}`, false); setTimeout(() => location.reload(), 800); }
+      else { const d = await res.json().catch(() => ({})); showMsg(d.error || "Failed", true); }
     });
 
     document.querySelectorAll(".remove-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const email = btn.dataset.email;
-        const res = await callApi(email, "remove");
-        if (res.ok) {
-          showMsg(`Removed ${email}`, false);
-          setTimeout(() => location.reload(), 1000);
-        } else {
-          showMsg("Failed to remove", true);
-        }
+        const res = await callUserApi(btn.dataset.email, "remove");
+        if (res.ok) { showMsg(`Removed`, false); setTimeout(() => location.reload(), 800); }
+        else showMsg("Failed", true);
+      });
+    });
+
+    document.getElementById("invite-group-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const groupId = document.getElementById("invite-group-select").value;
+      const res = await callGroupApi(groupId, "add");
+      if (res.ok) location.reload();
+      else showMsg("Failed to add group", true);
+    });
+
+    document.querySelectorAll(".remove-group-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const res = await callGroupApi(btn.dataset.groupId, "remove");
+        if (res.ok) location.reload();
+        else showMsg("Failed to remove group", true);
       });
     });
   </script>

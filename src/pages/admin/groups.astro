@@ -1,0 +1,124 @@
+---
+import BaseLayout from "../../layouts/base-layout.astro";
+import { getDb } from "../../lib/db";
+import { groups, userGroups } from "../../lib/db-schema";
+import { eq, sql } from "drizzle-orm";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user || user.role !== "admin") return Astro.redirect("/");
+
+const db = getDb(Astro.locals.runtime.env.DB);
+
+const groupsList = await db
+  .select({
+    id: groups.id,
+    name: groups.name,
+    memberCount: sql<number>`COUNT(${userGroups.userId})`,
+  })
+  .from(groups)
+  .leftJoin(userGroups, eq(userGroups.groupId, groups.id))
+  .groupBy(groups.id, groups.name)
+  .orderBy(groups.name);
+---
+
+<BaseLayout title="Groups — Admin">
+  <nav class="mb-8 flex items-center gap-6 text-xs tracking-widest uppercase">
+    <a href="/admin" class="text-film-muted hover:text-film-amber transition-colors duration-200">Rolls</a>
+    <a href="/admin/users" class="text-film-muted hover:text-film-amber transition-colors duration-200">Users</a>
+    <a href="/admin/groups" class="text-film-amber">Groups</a>
+  </nav>
+
+  <h2 class="mb-8 font-serif text-3xl font-light text-film-text">Manage Groups</h2>
+
+  <div class="mb-8 flex gap-3">
+    <input
+      id="group-name"
+      type="text"
+      placeholder="Group name…"
+      class="flex-1 max-w-xs rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors"
+    />
+    <button
+      id="create-btn"
+      class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200"
+    >
+      Create
+    </button>
+    <span id="create-msg" class="hidden self-center text-xs text-film-muted"></span>
+  </div>
+
+  {groupsList.length > 0 ? (
+    <div class="rounded-sm border border-film-border">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-film-border bg-film-surface">
+            <th class="px-4 py-3 text-xs tracking-widest uppercase text-film-muted font-normal">Name</th>
+            <th class="px-4 py-3 text-xs tracking-widest uppercase text-film-muted font-normal">Members</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {groupsList.map((g) => (
+            <tr class="border-b border-film-border last:border-0 hover:bg-film-surface transition-colors duration-150">
+              <td class="px-4 py-3 text-film-text">{g.name}</td>
+              <td class="px-4 py-3 text-film-muted text-xs">{g.memberCount}</td>
+              <td class="px-4 py-3">
+                <button
+                  class="delete-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150"
+                  data-id={g.id}
+                  data-name={g.name}
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <p class="font-serif text-xl italic text-film-faint">No groups yet.</p>
+  )}
+
+  <script>
+    async function post(body: object) {
+      return fetch("/api/admin/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+
+    const nameInput = document.getElementById("group-name") as HTMLInputElement;
+    const msg = document.getElementById("create-msg")!;
+
+    document.getElementById("create-btn")!.addEventListener("click", async () => {
+      const name = nameInput.value.trim();
+      if (!name) return;
+      const res = await post({ action: "create", name });
+      if (res.ok) {
+        location.reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        msg.textContent = (data as any).error || "Failed";
+        msg.className = "self-center text-xs text-red-400";
+        msg.classList.remove("hidden");
+      }
+    });
+
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("create-btn")!.click();
+    });
+
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const el = btn as HTMLElement;
+        if (!confirm(`Delete group "${el.dataset.name}"? Removes all memberships and access grants.`)) return;
+        const res = await post({ action: "delete", id: el.dataset.id });
+        if (res.ok) location.reload();
+        else alert("Delete failed");
+      });
+    });
+  </script>
+</BaseLayout>

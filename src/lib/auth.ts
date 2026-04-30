@@ -22,6 +22,12 @@ export function createAuth(d1: D1Database, secret: string, baseURL?: string) {
     }),
     secret,
     baseURL,
+    trustedOrigins: [
+      "http://localhost:8788",
+      "http://localhost:3000",
+      "http://127.0.0.1:8788",
+      ...(baseURL ? [baseURL] : []),
+    ],
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,

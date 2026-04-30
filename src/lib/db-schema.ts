@@ -88,7 +88,48 @@ export const rollAccess = sqliteTable(
   }),
 );
 
+// ---------- Group tables ----------
+
+/** Named user groups (e.g. "Family", "Clients"). */
+export const groups = sqliteTable("groups", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Many-to-many: which users belong to which groups. */
+export const userGroups = sqliteTable(
+  "user_groups",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.groupId] }) }),
+);
+
+/** Grants an entire group access to a private roll. */
+export const rollGroupAccess = sqliteTable(
+  "roll_group_access",
+  {
+    rollSlug: text("roll_slug")
+      .notNull()
+      .references(() => rolls.slug, { onDelete: "cascade" }),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.rollSlug, t.groupId] }) }),
+);
+
 export type User = typeof user.$inferSelect;
 export type Roll = typeof rolls.$inferSelect;
 export type NewRoll = typeof rolls.$inferInsert;
 export type RollAccess = typeof rollAccess.$inferSelect;
+export type Group = typeof groups.$inferSelect;
+export type NewGroup = typeof groups.$inferInsert;
+export type UserGroup = typeof userGroups.$inferSelect;
+export type RollGroupAccess = typeof rollGroupAccess.$inferSelect;

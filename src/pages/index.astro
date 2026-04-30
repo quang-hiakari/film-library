@@ -23,22 +23,80 @@ if (env?.R2 && env?.DB) {
 } else {
   fetchError = true;
 }
+
+// Extract sorted unique years for year-filter pills
+const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
 ---
 
 <BaseLayout>
   {albums.length > 0 ? (
-    <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-      {albums.map((album) => (
-        <AlbumCard
-          slug={album.slug}
-          title={album.title}
-          date={album.date}
-          filmStock={album.filmStock}
-          coverUrl={album.coverUrl}
-          visibility={album.visibility}
-        />
-      ))}
-    </div>
+    <>
+      <!-- Search + filter bar -->
+      <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="relative max-w-xs flex-1">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-film-faint" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Search rolls…"
+            autocomplete="off"
+            class="w-full rounded-sm border border-film-border bg-film-surface pl-9 pr-3 py-2 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
+          />
+        </div>
+
+        {years.length > 1 && (
+          <div class="flex flex-wrap items-center gap-2" id="year-filters">
+            <button
+              class="year-btn active cursor-pointer rounded-sm border px-3 py-1 text-xs tracking-widest uppercase transition-all duration-150"
+              data-year="all"
+            >
+              All
+            </button>
+            {years.map((y) => (
+              <button
+                class="year-btn cursor-pointer rounded-sm border px-3 py-1 text-xs tracking-widest uppercase transition-all duration-150"
+                data-year={y}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- Roll count indicator -->
+      <p id="result-count" class="mb-6 text-xs tracking-widest uppercase text-film-faint">
+        {albums.length} {albums.length === 1 ? "roll" : "rolls"}
+      </p>
+
+      <!-- Album grid -->
+      <div id="album-grid" class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        {albums.map((album) => (
+          <div
+            class="album-item"
+            data-title={album.title.toLowerCase()}
+            data-film-stock={(album.filmStock ?? "").toLowerCase()}
+            data-year={album.date.slice(0, 4)}
+          >
+            <AlbumCard
+              slug={album.slug}
+              title={album.title}
+              date={album.date}
+              filmStock={album.filmStock}
+              coverUrl={album.coverUrl}
+              visibility={album.visibility}
+            />
+          </div>
+        ))}
+      </div>
+
+      <!-- Empty filter state -->
+      <p id="no-results" class="hidden py-20 text-center font-serif text-2xl italic text-film-faint">
+        No rolls match your search.
+      </p>
+    </>
   ) : (
     <div class="py-24 text-center">
       <p class="font-serif text-2xl text-film-faint italic">
@@ -56,3 +114,74 @@ if (env?.R2 && env?.DB) {
     </div>
   )}
 </BaseLayout>
+
+<style>
+  .year-btn {
+    border-color: theme(colors.film.border);
+    color: theme(colors.film.muted);
+  }
+  .year-btn:hover {
+    border-color: rgb(201 169 110 / 0.4);
+    color: theme(colors.film.amber);
+  }
+  .year-btn.active {
+    border-color: rgb(201 169 110 / 0.6);
+    color: theme(colors.film.amber);
+    background-color: rgb(201 169 110 / 0.08);
+  }
+</style>
+
+<script define:vars={{ totalCount: albums.length }}>
+  const searchInput = document.getElementById("search-input");
+  const yearBtns = document.querySelectorAll(".year-btn");
+  const items = document.querySelectorAll(".album-item");
+  const resultCount = document.getElementById("result-count");
+  const noResults = document.getElementById("no-results");
+  const grid = document.getElementById("album-grid");
+
+  let activeYear = "all";
+  let searchQuery = "";
+
+  function applyFilters() {
+    let visible = 0;
+
+    items.forEach((item) => {
+      const el = item;
+      const title = el.dataset.title ?? "";
+      const filmStock = el.dataset.filmStock ?? "";
+      const year = el.dataset.year ?? "";
+
+      const matchesYear = activeYear === "all" || year === activeYear;
+      const matchesSearch = !searchQuery || title.includes(searchQuery) || filmStock.includes(searchQuery);
+
+      if (matchesYear && matchesSearch) {
+        el.style.display = "";
+        visible++;
+      } else {
+        el.style.display = "none";
+      }
+    });
+
+    const label = visible === 1 ? "roll" : "rolls";
+    resultCount.textContent = visible === totalCount
+      ? `${totalCount} ${label}`
+      : `${visible} of ${totalCount} ${label}`;
+
+    noResults.classList.toggle("hidden", visible > 0);
+    grid.classList.toggle("hidden", visible === 0);
+  }
+
+  searchInput?.addEventListener("input", (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    applyFilters();
+  });
+
+  yearBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeYear = btn.dataset.year;
+      yearBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      applyFilters();
+    });
+  });
+</script>

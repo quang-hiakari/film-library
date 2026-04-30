@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { rollAccess, rolls } from "./db-schema";
+import { rollAccess, rollGroupAccess, rolls, userGroups } from "./db-schema";
 import type { DB } from "./db";
 
 export type Visibility = "public" | "registered" | "private";
@@ -25,6 +25,7 @@ export async function getRollVisibility(
 /**
  * Check whether a user can view a roll.
  * Admins bypass all checks.
+ * Private rolls: allow via direct grant OR group membership grant.
  */
 export async function canAccessRoll(
   db: DB,
@@ -37,15 +38,27 @@ export async function canAccessRoll(
   if (!user) return false;
   if (visibility === "registered") return true;
 
-  // private: must have explicit grant in roll_access
-  const grant = await db
-    .select()
+  // private — direct user grant
+  const direct = await db
+    .select({ rollSlug: rollAccess.rollSlug })
     .from(rollAccess)
+    .where(and(eq(rollAccess.rollSlug, slug), eq(rollAccess.userId, user.id)))
+    .limit(1);
+  if (direct.length > 0) return true;
+
+  // private — via group membership
+  const viaGroup = await db
+    .select({ rollSlug: rollGroupAccess.rollSlug })
+    .from(rollGroupAccess)
+    .innerJoin(userGroups, eq(userGroups.groupId, rollGroupAccess.groupId))
     .where(
-      and(eq(rollAccess.rollSlug, slug), eq(rollAccess.userId, user.id)),
+      and(
+        eq(rollGroupAccess.rollSlug, slug),
+        eq(userGroups.userId, user.id),
+      ),
     )
     .limit(1);
-  return grant.length > 0;
+  return viaGroup.length > 0;
 }
 
 /** Bulk visibility lookup — returns a map of slug → visibility. */
@@ -58,14 +71,28 @@ export async function getVisibilityMap(
   return new Map(rows.map((r) => [r.slug, r.visibility as Visibility]));
 }
 
-/** Bulk access lookup for a single user — returns set of private roll slugs they can see. */
+/**
+ * Bulk access lookup for a single user.
+ * Returns set of private roll slugs visible to the user
+ * via direct grant OR group membership.
+ */
 export async function getPrivateGrants(
   db: DB,
   userId: string,
 ): Promise<Set<string>> {
-  const rows = await db
-    .select({ slug: rollAccess.rollSlug })
-    .from(rollAccess)
-    .where(eq(rollAccess.userId, userId));
-  return new Set(rows.map((r) => r.slug));
+  const [direct, viaGroup] = await Promise.all([
+    db
+      .select({ slug: rollAccess.rollSlug })
+      .from(rollAccess)
+      .where(eq(rollAccess.userId, userId)),
+    db
+      .select({ slug: rollGroupAccess.rollSlug })
+      .from(rollGroupAccess)
+      .innerJoin(userGroups, eq(userGroups.groupId, rollGroupAccess.groupId))
+      .where(eq(userGroups.userId, userId)),
+  ]);
+  return new Set([
+    ...direct.map((r) => r.slug),
+    ...viaGroup.map((r) => r.slug),
+  ]);
 }

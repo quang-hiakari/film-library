@@ -28,6 +28,12 @@ const rollList = r2Slugs.map((slug: string) => ({
 ---
 
 <BaseLayout title="Admin — Film Library">
+  <nav class="mb-8 flex items-center gap-6 text-xs tracking-widest uppercase">
+    <a href="/admin" class="text-film-amber">Rolls</a>
+    <a href="/admin/users" class="text-film-muted hover:text-film-amber transition-colors duration-200">Users</a>
+    <a href="/admin/groups" class="text-film-muted hover:text-film-amber transition-colors duration-200">Groups</a>
+  </nav>
+
   <div class="mb-8 flex items-center gap-6">
     <h2 class="font-serif text-3xl font-light text-film-text">Manage Rolls</h2>
     <div class="flex items-center gap-3">

@@ -1,0 +1,146 @@
+---
+import BaseLayout from "../../layouts/base-layout.astro";
+import { getDb } from "../../lib/db";
+import { user as userTable, groups, userGroups } from "../../lib/db-schema";
+
+export const prerender = false;
+
+const currentUser = Astro.locals.user;
+if (!currentUser || currentUser.role !== "admin") return Astro.redirect("/");
+
+const db = getDb(Astro.locals.runtime.env.DB);
+
+const [users, groupsList, memberships] = await Promise.all([
+  db.select({ id: userTable.id, name: userTable.name, email: userTable.email, role: userTable.role })
+    .from(userTable).orderBy(userTable.createdAt),
+  db.select({ id: groups.id, name: groups.name }).from(groups).orderBy(groups.name),
+  db.select({ userId: userGroups.userId, groupId: userGroups.groupId }).from(userGroups),
+]);
+
+const memberMap = new Map<string, Set<string>>();
+for (const m of memberships) {
+  if (!memberMap.has(m.userId)) memberMap.set(m.userId, new Set());
+  memberMap.get(m.userId)!.add(m.groupId);
+}
+---
+
+<BaseLayout title="Users — Admin">
+  <nav class="mb-8 flex items-center gap-6 text-xs tracking-widest uppercase">
+    <a href="/admin" class="text-film-muted hover:text-film-amber transition-colors duration-200">Rolls</a>
+    <a href="/admin/users" class="text-film-amber">Users</a>
+    <a href="/admin/groups" class="text-film-muted hover:text-film-amber transition-colors duration-200">Groups</a>
+  </nav>
+
+  <h2 class="mb-8 font-serif text-3xl font-light text-film-text">Manage Users</h2>
+
+  <div class="space-y-3">
+    {users.map((u) => {
+      const myGroups = memberMap.get(u.id) ?? new Set();
+      return (
+        <div
+          class="rounded-sm border border-film-border bg-film-surface px-5 py-4"
+          data-user-id={u.id}
+          data-init-role={u.role}
+          data-init-groups={JSON.stringify([...myGroups])}
+        >
+          <div class="flex flex-wrap items-start gap-6">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-film-text">{u.name}</p>
+              <p class="text-xs text-film-muted">{u.email}</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-xs tracking-widest uppercase text-film-muted">Role</label>
+              <select
+                class="role-select cursor-pointer rounded-sm border border-film-border bg-film-bg px-2 py-1 text-xs text-film-text focus:border-film-amber/50 focus:outline-none"
+              >
+                <option value="user" selected={u.role === "user"}>User</option>
+                <option value="admin" selected={u.role === "admin"}>Admin</option>
+              </select>
+            </div>
+
+            {groupsList.length > 0 && (
+              <div class="flex flex-wrap items-center gap-3">
+                <span class="text-xs tracking-widest uppercase text-film-muted">Groups</span>
+                {groupsList.map((g) => (
+                  <label class="flex cursor-pointer items-center gap-1.5 text-xs text-film-muted hover:text-film-text transition-colors">
+                    <input
+                      type="checkbox"
+                      class="group-cb accent-[#C9A96E]"
+                      data-group-id={g.id}
+                      checked={myGroups.has(g.id)}
+                    />
+                    {g.name}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div class="flex items-center gap-3">
+              <button class="save-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-150">
+                Save
+              </button>
+              <span class="save-msg hidden text-xs text-film-muted"></span>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  {users.length === 0 && (
+    <p class="font-serif text-xl italic text-film-faint">No users yet.</p>
+  )}
+
+  <script>
+    async function post(url: string, body: object) {
+      return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    }
+
+    document.querySelectorAll("[data-user-id]").forEach((row) => {
+      const el = row as HTMLElement;
+      const userId = el.dataset.userId!;
+      const initRole = el.dataset.initRole!;
+      const initGroups = new Set<string>(JSON.parse(el.dataset.initGroups!));
+
+      const saveBtn = el.querySelector(".save-btn")!;
+      const saveMsg = el.querySelector(".save-msg") as HTMLElement;
+
+      function showMsg(text: string, ok: boolean) {
+        saveMsg.textContent = text;
+        saveMsg.className = `save-msg text-xs ${ok ? "text-film-amber" : "text-red-400"}`;
+        saveMsg.classList.remove("hidden");
+        setTimeout(() => saveMsg.classList.add("hidden"), 2000);
+      }
+
+      saveBtn.addEventListener("click", async () => {
+        const roleSelect = el.querySelector(".role-select") as HTMLSelectElement;
+        const checkboxes = el.querySelectorAll(".group-cb") as NodeListOf<HTMLInputElement>;
+
+        const ops: Promise<Response>[] = [];
+
+        if (roleSelect.value !== initRole) {
+          ops.push(post("/api/admin/user-groups", { action: "set-role", userId, role: roleSelect.value }));
+        }
+
+        checkboxes.forEach((cb) => {
+          const groupId = cb.dataset.groupId!;
+          const wasIn = initGroups.has(groupId);
+          if (cb.checked && !wasIn) ops.push(post("/api/admin/user-groups", { action: "add", userId, groupId }));
+          if (!cb.checked && wasIn) ops.push(post("/api/admin/user-groups", { action: "remove", userId, groupId }));
+        });
+
+        if (ops.length === 0) { showMsg("No changes", true); return; }
+
+        const results = await Promise.all(ops);
+        const allOk = results.every((r) => r.ok);
+        if (allOk) { showMsg("Saved", true); setTimeout(() => location.reload(), 800); }
+        else { showMsg("Error", false); }
+      });
+    });
+  </script>
+</BaseLayout>
