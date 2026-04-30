@@ -31,19 +31,21 @@ const displayDate = new Date(album.date).toLocaleDateString("en-US", {
 
 <BaseLayout title={`${album.title} — Film Library`}>
   <div class="mb-8">
-    <a href="/" class="text-sm text-gray-400 hover:text-gray-600">&larr; Back</a>
+    <a href="/" class="text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-200">
+      &larr; Library
+    </a>
   </div>
 
-  <header class="mb-10">
-    <h1 class="text-2xl font-light text-gray-900">{album.title}</h1>
-    <p class="mt-1 text-sm text-gray-500">
+  <header class="mb-10 border-b border-film-border pb-8">
+    <h1 class="font-serif text-4xl font-light text-film-text">{album.title}</h1>
+    <p class="mt-2 text-xs tracking-widest uppercase text-film-muted">
       {displayDate}
-      {album.filmStock && <span> &middot; {album.filmStock}</span>}
-      {album.camera && <span> &middot; {album.camera}</span>}
-      {album.frames && <span> &middot; {album.frames} frames</span>}
+      {album.filmStock && <span class="text-film-faint"> · {album.filmStock}</span>}
+      {album.camera && <span class="text-film-faint"> · {album.camera}</span>}
+      {album.frames && <span class="text-film-faint"> · {album.frames} frames</span>}
     </p>
     {album.description && (
-      <p class="mt-3 max-w-2xl text-sm text-gray-600">{album.description}</p>
+      <p class="mt-4 max-w-2xl text-sm leading-relaxed text-film-muted">{album.description}</p>
     )}
   </header>
 

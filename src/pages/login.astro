@@ -3,49 +3,50 @@ import BaseLayout from "../layouts/base-layout.astro";
 
 export const prerender = false;
 
-// Already logged in? redirect home.
 if (Astro.locals.user) {
   return Astro.redirect("/");
 }
 ---
 
 <BaseLayout title="Log in — Film Library">
-  <div class="mx-auto max-w-sm py-12">
-    <h2 class="mb-8 text-center text-xl font-light text-gray-900">Log in</h2>
+  <div class="mx-auto max-w-sm py-16">
+    <h2 class="mb-8 text-center font-serif text-3xl font-light text-film-text">Log in</h2>
 
-    <form id="login-form" class="space-y-4">
-      <div>
-        <label for="email" class="block text-sm text-gray-600">Email</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          class="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
-        />
-      </div>
-      <div>
-        <label for="password" class="block text-sm text-gray-600">Password</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          class="mt-1 w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
-        />
-      </div>
-      <p id="error" class="hidden text-sm text-red-600"></p>
-      <button
-        type="submit"
-        class="w-full rounded bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-700"
-      >
-        Log in
-      </button>
-    </form>
+    <div class="rounded-sm border border-film-border bg-film-surface p-8">
+      <form id="login-form" class="space-y-5">
+        <div>
+          <label for="email" class="block text-xs tracking-widest uppercase text-film-muted mb-2">Email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
+          />
+        </div>
+        <div>
+          <label for="password" class="block text-xs tracking-widest uppercase text-film-muted mb-2">Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
+          />
+        </div>
+        <p id="error" class="hidden text-xs text-red-400"></p>
+        <button
+          type="submit"
+          class="w-full cursor-pointer rounded-sm border border-film-amber/60 py-2.5 text-sm text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200 tracking-wide"
+        >
+          Log in
+        </button>
+      </form>
+    </div>
 
-    <p class="mt-6 text-center text-sm text-gray-500">
+    <p class="mt-6 text-center text-xs text-film-muted tracking-wide">
       No account?
-      <a href="/register" class="text-gray-900 underline">Register</a>
+      <a href="/register" class="text-film-amber hover:text-film-amber-hover transition-colors duration-200 ml-1">Register</a>
     </p>
   </div>
 

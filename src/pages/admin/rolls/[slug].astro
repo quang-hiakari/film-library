@@ -15,11 +15,9 @@ if (!slug) return Astro.redirect("/admin");
 const env = Astro.locals.runtime.env;
 const db = getDb(env.DB);
 
-// Get roll visibility
 const rollRow = await db.select().from(rolls).where(eq(rolls.slug, slug)).limit(1);
 const visibility = rollRow[0]?.visibility ?? "registered";
 
-// Get invited users for private rolls
 const grants = await db
   .select({ userId: rollAccess.userId, name: userTable.name, email: userTable.email })
   .from(rollAccess)
@@ -28,25 +26,32 @@ const grants = await db
 ---
 
 <BaseLayout title={`Admin: ${slug} — Film Library`}>
-  <div class="mb-6">
-    <a href="/admin" class="text-sm text-gray-400 hover:text-gray-600">&larr; Back to admin</a>
+  <div class="mb-8">
+    <a href="/admin" class="text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-200">
+      &larr; Back to admin
+    </a>
   </div>
 
-  <h2 class="mb-2 text-xl font-light text-gray-900">{slug}</h2>
-  <p class="mb-8 text-sm text-gray-500">
-    Current visibility: <strong class="text-gray-700">{visibility}</strong>
-  </p>
+  <header class="mb-10 border-b border-film-border pb-8">
+    <h2 class="font-serif text-3xl font-light text-film-text">{slug}</h2>
+    <p class="mt-2 text-xs tracking-widest uppercase text-film-muted">
+      Visibility: <span class="text-film-amber">{visibility}</span>
+    </p>
+  </header>
 
   <section>
-    <h3 class="mb-4 text-base font-medium text-gray-900">User Access (Private Rolls)</h3>
+    <h3 class="mb-5 text-xs tracking-widest uppercase text-film-muted">User Access</h3>
 
     {grants.length > 0 ? (
       <ul class="mb-6 space-y-2">
         {grants.map((g) => (
-          <li class="flex items-center justify-between rounded border border-gray-100 px-4 py-2 text-sm">
-            <span>{g.name} ({g.email})</span>
+          <li class="flex items-center justify-between rounded-sm border border-film-border bg-film-surface px-4 py-3 text-sm">
+            <span class="text-film-text">
+              {g.name}
+              <span class="ml-2 text-film-muted text-xs">{g.email}</span>
+            </span>
             <button
-              class="remove-btn text-red-500 hover:text-red-700"
+              class="remove-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150"
               data-email={g.email}
             >
               Remove
@@ -55,7 +60,7 @@ const grants = await db
         ))}
       </ul>
     ) : (
-      <p class="mb-6 text-sm text-gray-400">No users invited yet.</p>
+      <p class="mb-6 font-serif text-lg italic text-film-faint">No users invited yet.</p>
     )}
 
     <form id="invite-form" class="flex gap-3">
@@ -64,16 +69,16 @@ const grants = await db
         type="email"
         required
         placeholder="user@example.com"
-        class="flex-1 rounded border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+        class="flex-1 rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
       />
       <button
         type="submit"
-        class="rounded bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
+        class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200"
       >
         Invite
       </button>
     </form>
-    <p id="invite-msg" class="mt-2 hidden text-sm"></p>
+    <p id="invite-msg" class="mt-2 hidden text-xs"></p>
   </section>
 
   <script define:vars={{ slug }}>
@@ -81,7 +86,7 @@ const grants = await db
 
     function showMsg(text, isError) {
       msg.textContent = text;
-      msg.className = `mt-2 text-sm ${isError ? "text-red-600" : "text-green-600"}`;
+      msg.className = `mt-2 text-xs ${isError ? "text-red-400" : "text-film-amber"}`;
       msg.classList.remove("hidden");
       setTimeout(() => msg.classList.add("hidden"), 3000);
     }

@@ -8,13 +8,41 @@ const { photos } = Astro.props;
 
 <div
   id="lightbox"
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/90"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95 backdrop-blur-sm"
 >
-  <button id="lb-close" class="absolute right-4 top-4 text-3xl text-white/70 hover:text-white">&times;</button>
-  <button id="lb-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-4xl text-white/70 hover:text-white">&lsaquo;</button>
-  <button id="lb-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-4xl text-white/70 hover:text-white">&rsaquo;</button>
-  <img id="lb-img" class="max-h-[90vh] max-w-[90vw] object-contain" />
-  <span id="lb-counter" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/60"></span>
+  <button
+    id="lb-close"
+    class="absolute right-5 top-5 cursor-pointer text-film-muted hover:text-film-text transition-colors duration-150"
+    aria-label="Close"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+
+  <button
+    id="lb-prev"
+    class="absolute left-4 top-1/2 -translate-y-1/2 cursor-pointer text-film-muted hover:text-film-amber transition-colors duration-150 p-2"
+    aria-label="Previous"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  </button>
+
+  <button
+    id="lb-next"
+    class="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-film-muted hover:text-film-amber transition-colors duration-150 p-2"
+    aria-label="Next"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  </button>
+
+  <img id="lb-img" class="max-h-[88vh] max-w-[88vw] object-contain" alt="" />
+
+  <span id="lb-counter" class="absolute bottom-5 left-1/2 -translate-x-1/2 text-xs tracking-widest text-film-muted font-mono"></span>
 </div>
 
 <script define:vars={{ photos }}>
@@ -27,7 +55,7 @@ const { photos } = Astro.props;
   function show(i) {
     current = ((i % photos.length) + photos.length) % photos.length;
     img.src = photos[current];
-    counter.textContent = `${current + 1} / ${photos.length}`;
+    counter.textContent = `${String(current + 1).padStart(2, "0")} / ${String(photos.length).padStart(2, "0")}`;
     lb.classList.remove("hidden");
     lb.classList.add("flex");
   }
@@ -54,7 +82,6 @@ const { photos } = Astro.props;
     if (e.key === "ArrowRight") show(current + 1);
   });
 
-  // Touch swipe
   lb.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; });
   lb.addEventListener("touchend", (e) => {
     const dx = e.changedTouches[0].clientX - startX;

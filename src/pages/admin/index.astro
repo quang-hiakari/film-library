@@ -12,17 +12,14 @@ if (!user || user.role !== "admin") return Astro.redirect("/");
 const env = Astro.locals.runtime.env;
 const db = getDb(env.DB);
 
-// List R2 roll folders
 const listing = await env.R2.list({ prefix: "rolls/", delimiter: "/" });
 const r2Slugs = listing.delimitedPrefixes.map((p: string) =>
   p.replace("rolls/", "").replace(/\/$/, ""),
 );
 
-// Get D1 visibility data
 const dbRolls = await db.select().from(rolls);
 const visMap = new Map(dbRolls.map((r) => [r.slug, r.visibility as Visibility]));
 
-// Merge: R2 is source of truth for existence, D1 for visibility
 const rollList = r2Slugs.map((slug: string) => ({
   slug,
   visibility: visMap.get(slug) ?? "registered",
@@ -31,48 +28,57 @@ const rollList = r2Slugs.map((slug: string) => ({
 ---
 
 <BaseLayout title="Admin — Film Library">
-  <h2 class="mb-6 text-xl font-light text-gray-900">Manage Rolls</h2>
+  <div class="mb-8 flex items-center gap-6">
+    <h2 class="font-serif text-3xl font-light text-film-text">Manage Rolls</h2>
+    <div class="flex items-center gap-3">
+      <button
+        id="sync-btn"
+        class="cursor-pointer rounded-sm border border-film-border px-4 py-1.5 text-xs tracking-widest uppercase text-film-muted hover:border-film-amber/40 hover:text-film-amber transition-all duration-200"
+      >
+        Sync R2 → D1
+      </button>
+      <span id="sync-status" class="text-xs text-film-muted"></span>
+    </div>
+  </div>
 
-  <button
-    id="sync-btn"
-    class="mb-6 rounded bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
-  >
-    Sync R2 → D1
-  </button>
-  <span id="sync-status" class="ml-3 text-sm text-gray-500"></span>
-
-  <div class="overflow-x-auto">
+  <div class="overflow-x-auto rounded-sm border border-film-border">
     <table class="w-full text-left text-sm">
       <thead>
-        <tr class="border-b text-gray-500">
-          <th class="pb-2 font-medium">Roll</th>
-          <th class="pb-2 font-medium">Visibility</th>
-          <th class="pb-2 font-medium">DB</th>
-          <th class="pb-2 font-medium"></th>
+        <tr class="border-b border-film-border bg-film-surface">
+          <th class="px-4 py-3 text-xs tracking-widest uppercase text-film-muted font-normal">Roll</th>
+          <th class="px-4 py-3 text-xs tracking-widest uppercase text-film-muted font-normal">Visibility</th>
+          <th class="px-4 py-3 text-xs tracking-widest uppercase text-film-muted font-normal">Status</th>
+          <th class="px-4 py-3"></th>
         </tr>
       </thead>
       <tbody>
         {rollList.map((roll) => (
-          <tr class="border-b border-gray-100" data-slug={roll.slug}>
-            <td class="py-3">
-              <a href={`/admin/rolls/${roll.slug}`} class="text-gray-900 hover:underline">
+          <tr class="border-b border-film-border last:border-0 hover:bg-film-surface transition-colors duration-150" data-slug={roll.slug}>
+            <td class="px-4 py-3">
+              <a href={`/admin/rolls/${roll.slug}`} class="text-film-text hover:text-film-amber transition-colors duration-150 font-mono text-xs">
                 {roll.slug}
               </a>
             </td>
-            <td class="py-3">
-              <select class="vis-select rounded border px-2 py-1 text-sm" data-slug={roll.slug}>
+            <td class="px-4 py-3">
+              <select
+                class="vis-select cursor-pointer rounded-sm border border-film-border bg-film-bg px-2 py-1 text-xs text-film-text focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
+                data-slug={roll.slug}
+              >
                 <option value="public" selected={roll.visibility === "public"}>Public</option>
-                <option value="registered" selected={roll.visibility === "registered"}>Registered</option>
+                <option value="registered" selected={roll.visibility === "registered"}>Members</option>
                 <option value="private" selected={roll.visibility === "private"}>Private</option>
               </select>
             </td>
-            <td class="py-3">
-              <span class={roll.inDb ? "text-green-600" : "text-gray-400"}>
+            <td class="px-4 py-3">
+              <span class={`text-xs tracking-wide ${roll.inDb ? "text-film-amber" : "text-film-faint"}`}>
                 {roll.inDb ? "synced" : "not synced"}
               </span>
             </td>
-            <td class="py-3">
-              <button class="save-btn text-sm text-gray-700 hover:text-gray-900" data-slug={roll.slug}>
+            <td class="px-4 py-3">
+              <button
+                class="save-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-150"
+                data-slug={roll.slug}
+              >
                 Save
               </button>
             </td>
@@ -82,8 +88,11 @@ const rollList = r2Slugs.map((slug: string) => ({
     </table>
   </div>
 
+  {rollList.length === 0 && (
+    <p class="py-12 text-center font-serif text-xl italic text-film-faint">No rolls found in R2.</p>
+  )}
+
   <script>
-    // Save visibility
     document.querySelectorAll(".save-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const slug = (btn as HTMLElement).dataset.slug;
@@ -93,22 +102,22 @@ const rollList = r2Slugs.map((slug: string) => ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ slug, visibility: select.value }),
         });
-        (btn as HTMLElement).textContent = res.ok ? "Saved!" : "Error";
-        setTimeout(() => { (btn as HTMLElement).textContent = "Save"; }, 1500);
+        const el = btn as HTMLElement;
+        el.textContent = res.ok ? "Saved" : "Error";
+        setTimeout(() => { el.textContent = "Save"; }, 1500);
       });
     });
 
-    // Sync R2 → D1
     document.getElementById("sync-btn")?.addEventListener("click", async () => {
       const status = document.getElementById("sync-status")!;
       status.textContent = "Syncing...";
       const res = await fetch("/api/admin/sync-rolls", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        status.textContent = `Synced ${data.added} new rolls`;
+        status.textContent = `${data.added} added`;
         setTimeout(() => location.reload(), 1000);
       } else {
-        status.textContent = "Sync failed";
+        status.textContent = "Failed";
       }
     });
   </script>

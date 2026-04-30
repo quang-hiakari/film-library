@@ -40,14 +40,19 @@ if (env?.R2 && env?.DB) {
       ))}
     </div>
   ) : (
-    <div class="py-20 text-center">
-      <p class="text-gray-400">
+    <div class="py-24 text-center">
+      <p class="font-serif text-2xl text-film-faint italic">
         {fetchError
-          ? "Storage not configured. Run via `wrangler pages dev` for local bindings."
+          ? "Storage not configured."
           : user
           ? "No albums visible to you yet."
-          : "No public albums yet. Log in to see more."}
+          : "No public albums yet."}
       </p>
+      {!user && !fetchError && (
+        <a href="/login" class="mt-4 inline-block text-xs tracking-widest uppercase text-film-amber hover:text-film-amber-hover transition-colors duration-200">
+          Log in to see more
+        </a>
+      )}
     </div>
   )}
 </BaseLayout>

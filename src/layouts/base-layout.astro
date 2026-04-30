@@ -1,4 +1,6 @@
 ---
+import "../styles/global.css";
+
 interface Props {
   title?: string;
   description?: string;
@@ -21,36 +23,36 @@ const isAdmin = user?.role === "admin";
     <meta name="description" content={description} />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen bg-white">
-    <header class="border-b border-gray-100 px-6 py-6">
+  <body class="min-h-screen flex flex-col">
+    <header class="border-b border-film-border px-6 py-5">
       <div class="mx-auto flex max-w-6xl items-center justify-between">
-        <a href="/" class="text-xl font-light tracking-wide text-gray-900">
+        <a href="/" class="font-serif text-xl tracking-wide text-film-text hover:text-film-amber transition-colors duration-200">
           Film Library
         </a>
-        <nav class="flex items-center gap-5 text-sm">
+        <nav class="flex items-center gap-6 text-sm">
           {user ? (
             <>
-              <span class="text-gray-500">{user.name}</span>
+              <span class="text-film-muted">{user.name}</span>
               {isAdmin && (
-                <a href="/admin" class="text-gray-700 hover:text-gray-900">
+                <a href="/admin" class="text-film-muted hover:text-film-amber transition-colors duration-200">
                   Admin
                 </a>
               )}
               <button
                 id="logout-btn"
-                class="text-gray-700 hover:text-gray-900"
+                class="cursor-pointer text-film-muted hover:text-film-amber transition-colors duration-200"
               >
                 Log out
               </button>
             </>
           ) : (
             <>
-              <a href="/login" class="text-gray-700 hover:text-gray-900">
+              <a href="/login" class="text-film-muted hover:text-film-text transition-colors duration-200">
                 Log in
               </a>
               <a
                 href="/register"
-                class="rounded bg-gray-900 px-3 py-1.5 text-white hover:bg-gray-700"
+                class="rounded-sm border border-film-amber/60 px-3 py-1.5 text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200"
               >
                 Register
               </a>
@@ -60,11 +62,11 @@ const isAdmin = user?.role === "admin";
       </div>
     </header>
 
-    <main class="mx-auto max-w-6xl px-6 py-8">
+    <main class="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
       <slot />
     </main>
 
-    <footer class="border-t border-gray-100 px-6 py-6 text-center text-sm text-gray-400">
+    <footer class="border-t border-film-border px-6 py-5 text-center text-xs text-film-faint tracking-widest uppercase">
       &copy; {new Date().getFullYear()} Film Library
     </footer>
 

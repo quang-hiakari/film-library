@@ -18,33 +18,36 @@ const displayDate = new Date(date).toLocaleDateString("en-US", {
 });
 
 const badge = visibility === "private"
-  ? { text: "Private", style: "bg-red-500/80" }
+  ? { text: "Private", cls: "border-red-800/60 text-red-400" }
   : visibility === "registered"
-  ? { text: "Members", style: "bg-gray-700/80" }
+  ? { text: "Members", cls: "border-film-border text-film-muted" }
   : null;
 ---
 
-<a href={`/rolls/${slug}`} class="group block">
-  <div class="relative overflow-hidden rounded-lg bg-gray-100" style="aspect-ratio: 3/2;">
+<a href={`/rolls/${slug}`} class="group block cursor-pointer">
+  <div
+    class="relative overflow-hidden bg-film-surface border border-film-border transition-all duration-300 group-hover:border-film-amber/30 group-hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
+    style="aspect-ratio: 3/2;"
+  >
     <img
       src={coverUrl}
       alt={title}
       loading="lazy"
       decoding="async"
-      class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+      class="h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.03] group-hover:brightness-110"
     />
     {badge && (
-      <span
-        class={`absolute right-3 top-3 rounded-full px-2 py-0.5 text-xs font-medium text-white ${badge.style}`}
-      >
+      <span class={`absolute right-2.5 top-2.5 rounded-sm border px-1.5 py-0.5 text-[10px] tracking-wider uppercase backdrop-blur-sm bg-film-bg/60 ${badge.cls}`}>
         {badge.text}
       </span>
     )}
+    <!-- Hover overlay -->
+    <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
   </div>
-  <div class="mt-3">
-    <h2 class="text-base font-medium text-gray-900">{title}</h2>
-    <p class="mt-0.5 text-sm text-gray-500">
-      {displayDate}{filmStock && ` · ${filmStock}`}
+  <div class="mt-3 px-0.5">
+    <h2 class="font-serif text-lg text-film-text group-hover:text-film-amber transition-colors duration-200">{title}</h2>
+    <p class="mt-0.5 text-xs tracking-wide text-film-muted">
+      {displayDate}{filmStock && <span class="text-film-faint"> · {filmStock}</span>}
     </p>
   </div>
 </a>
