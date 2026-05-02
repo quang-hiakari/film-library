@@ -9,7 +9,15 @@ type Runtime = import("@astrojs/cloudflare").Runtime<{
   R2_ACCESS_KEY_ID: string;
   R2_SECRET_ACCESS_KEY: string;
   R2_BUCKET_NAME: string;
+  TURNSTILE_SECRET_KEY: string;
+  RESEND_API_KEY: string;
+  RESEND_FROM_EMAIL: string;
 }>;
+
+interface ImportMetaEnv {
+  readonly PUBLIC_TURNSTILE_SITE_KEY: string;
+}
+interface ImportMeta { readonly env: ImportMetaEnv; }
 
 type AuthUser = {
   id: string;
@@ -17,7 +25,7 @@ type AuthUser = {
   email: string;
   emailVerified: boolean;
   image?: string | null;
-  role?: string;
+  role?: string | null | undefined;
 } | null;
 
 type AuthSession = {

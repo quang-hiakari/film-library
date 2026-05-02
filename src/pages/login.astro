@@ -16,29 +16,17 @@ if (Astro.locals.user) {
       <form id="login-form" class="space-y-5">
         <div>
           <label for="email" class="block text-xs tracking-widest uppercase text-film-muted mb-2">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
-          />
+          <input id="email" name="email" type="email" required
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200" />
         </div>
         <div>
           <label for="password" class="block text-xs tracking-widest uppercase text-film-muted mb-2">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
-          />
+          <input id="password" name="password" type="password" required
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200" />
         </div>
         <p id="error" class="hidden text-xs text-red-400"></p>
-        <button
-          type="submit"
-          class="w-full cursor-pointer rounded-sm border border-film-amber/60 py-2.5 text-sm text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200 tracking-wide"
-        >
+        <button type="submit"
+          class="w-full cursor-pointer rounded-sm border border-film-amber/60 py-2.5 text-sm text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200 tracking-wide">
           Log in
         </button>
       </form>
@@ -65,7 +53,10 @@ if (Astro.locals.user) {
         password: data.get("password") as string,
       });
       if (error) {
-        errorEl.textContent = error.message ?? "Invalid email or password";
+        const code = (error as Record<string, unknown>).code as string | undefined;
+        errorEl.textContent = code === "EMAIL_NOT_VERIFIED"
+          ? "Email not yet verified. Please check your inbox for the activation link."
+          : (error.message ?? "Invalid email or password");
         errorEl.classList.remove("hidden");
         return;
       }

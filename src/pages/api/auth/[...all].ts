@@ -9,6 +9,8 @@ const handler: APIRoute = async ({ request, locals }) => {
     env.DB,
     env.BETTER_AUTH_SECRET,
     env.BETTER_AUTH_URL,
+    env.RESEND_API_KEY,
+    env.RESEND_FROM_EMAIL,
   );
   return auth.handler(request);
 };

@@ -14,11 +14,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
         env.DB,
         env.BETTER_AUTH_SECRET,
         env.BETTER_AUTH_URL,
+        env.RESEND_API_KEY,
+        env.RESEND_FROM_EMAIL,
       );
       const session = await auth.api.getSession({
         headers: context.request.headers,
       });
-      context.locals.user = session?.user ?? null;
+      context.locals.user = (session?.user ?? null) as AuthUser;
       context.locals.session = session?.session ?? null;
     } catch (err) {
       console.warn("auth middleware error:", err);

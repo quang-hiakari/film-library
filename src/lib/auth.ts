@@ -3,12 +3,19 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./db-schema";
+import { buildVerificationEmail, sendEmail } from "./email-service";
 
 /**
  * Create a Better Auth instance bound to a specific D1 database.
  * Must be called per-request because the D1 binding only exists in `Astro.locals.runtime`.
  */
-export function createAuth(d1: D1Database, secret: string, baseURL?: string) {
+export function createAuth(
+  d1: D1Database,
+  secret: string,
+  baseURL?: string,
+  resendApiKey?: string,
+  resendFromEmail?: string,
+) {
   const db = getDb(d1);
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -30,8 +37,26 @@ export function createAuth(d1: D1Database, secret: string, baseURL?: string) {
     ],
     emailAndPassword: {
       enabled: true,
-      autoSignIn: true,
+      autoSignIn: false,
+      requireEmailVerification: true,
       minPasswordLength: 8,
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      expiresIn: 60 * 60 * 24, // 24h
+      sendVerificationEmail: async ({ user, url }) => {
+        if (!resendApiKey || !resendFromEmail) {
+          console.error("[auth] verification email skipped — Resend not configured");
+          return;
+        }
+        const { subject, html, text } = buildVerificationEmail(user.name, url);
+        try {
+          await sendEmail(resendApiKey, resendFromEmail, { to: user.email, subject, html, text });
+        } catch (err) {
+          console.error("[auth] verification email failed", err);
+        }
+      },
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7, // 7 days
@@ -43,14 +68,13 @@ export function createAuth(d1: D1Database, secret: string, baseURL?: string) {
           type: "string",
           required: false,
           defaultValue: "user",
-          input: false, // never set from user input
+          input: false,
         },
       },
     },
     databaseHooks: {
       user: {
         create: {
-          // First registered user becomes admin.
           before: async (userData) => {
             const existing = await db
               .select({ count: sql<number>`count(*)` })

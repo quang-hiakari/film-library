@@ -11,7 +11,7 @@ if (!currentUser || currentUser.role !== "admin") return Astro.redirect("/");
 const db = getDb(Astro.locals.runtime.env.DB);
 
 const [users, groupsList, memberships] = await Promise.all([
-  db.select({ id: userTable.id, name: userTable.name, email: userTable.email, role: userTable.role })
+  db.select({ id: userTable.id, name: userTable.name, email: userTable.email, role: userTable.role, emailVerified: userTable.emailVerified })
     .from(userTable).orderBy(userTable.createdAt),
   db.select({ id: groups.id, name: groups.name }).from(groups).orderBy(groups.name),
   db.select({ userId: userGroups.userId, groupId: userGroups.groupId }).from(userGroups),
@@ -22,6 +22,11 @@ for (const m of memberships) {
   if (!memberMap.has(m.userId)) memberMap.set(m.userId, new Set());
   memberMap.get(m.userId)!.add(m.groupId);
 }
+
+const userRows = users.map((u) => {
+  const myGroups = memberMap.get(u.id) ?? new Set<string>();
+  return { ...u, groupsJson: JSON.stringify([...myGroups]), groupCount: myGroups.size };
+});
 ---
 
 <BaseLayout title="Users — Admin">
@@ -34,79 +39,92 @@ for (const m of memberships) {
   <h2 class="mb-8 font-serif text-3xl font-light text-film-text">Manage Users</h2>
 
   <div class="space-y-3">
-    {users.map((u) => {
-      const myGroups = memberMap.get(u.id) ?? new Set();
-      return (
-        <div
-          class="rounded-sm border border-film-border bg-film-surface px-5 py-4"
-          data-user-id={u.id}
-          data-init-role={u.role}
-          data-init-groups={JSON.stringify([...myGroups])}
-        >
-          <div class="flex flex-wrap items-start gap-6">
-            <div class="min-w-0 flex-1">
-              <p class="text-sm text-film-text">{u.name}</p>
-              <p class="text-xs text-film-muted">{u.email}</p>
-            </div>
+    {userRows.map((u) => (
+      <div
+        class="rounded-sm border border-film-border bg-film-surface px-5 py-4"
+        data-user-id={u.id}
+        data-init-role={u.role}
+        data-init-groups={u.groupsJson}
+        data-pending-groups={u.groupsJson}
+        data-user-name={u.name}
+      >
+        <div class="flex flex-wrap items-center gap-6">
+          <div class="min-w-0 flex-1">
+            <p class="text-sm text-film-text">{u.name}</p>
+            <p class="text-xs text-film-muted">{u.email}</p>
+          </div>
 
-            <div class="flex items-center gap-2">
-              <label class="text-xs tracking-widest uppercase text-film-muted">Role</label>
-              <select
-                class="role-select cursor-pointer rounded-sm border border-film-border bg-film-bg px-2 py-1 text-xs text-film-text focus:border-film-amber/50 focus:outline-none"
-              >
-                <option value="user" selected={u.role === "user"}>User</option>
-                <option value="admin" selected={u.role === "admin"}>Admin</option>
-              </select>
-            </div>
-
-            {groupsList.length > 0 && (
-              <div class="flex flex-wrap items-center gap-3">
-                <span class="text-xs tracking-widest uppercase text-film-muted">Groups</span>
-                {groupsList.map((g) => (
-                  <label class="flex cursor-pointer items-center gap-1.5 text-xs text-film-muted hover:text-film-text transition-colors">
-                    <input
-                      type="checkbox"
-                      class="group-cb accent-[#C9A96E]"
-                      data-group-id={g.id}
-                      checked={myGroups.has(g.id)}
-                    />
-                    {g.name}
-                  </label>
-                ))}
-              </div>
-            )}
-
-            <div class="flex items-center gap-3">
-              <button class="save-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-150">
-                Save
+          <div class="flex items-center gap-2">
+            <span class={`verify-badge text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border ${u.emailVerified ? "border-film-amber/40 text-film-amber" : "border-film-border text-film-muted"}`}>
+              {u.emailVerified ? "Verified" : "Unverified"}
+            </span>
+            {!u.emailVerified && (
+              <button class="activate-btn cursor-pointer text-[10px] tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-150">
+                Activate
               </button>
-              <span class="save-msg hidden text-xs text-film-muted"></span>
-            </div>
+            )}
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label class="text-xs tracking-widest uppercase text-film-muted">Role</label>
+            <select class="role-select cursor-pointer rounded-sm border border-film-border bg-film-bg px-2 py-1 text-xs text-film-text focus:border-film-amber/50 focus:outline-none">
+              <option value="user" selected={u.role === "user"}>User</option>
+              <option value="admin" selected={u.role === "admin"}>Admin</option>
+            </select>
+          </div>
+
+          {u.role === "user" && groupsList.length > 0 && (
+            <button class="open-groups-btn cursor-pointer rounded-sm border border-film-border px-3 py-1 text-xs tracking-widest uppercase text-film-muted hover:border-film-amber/50 hover:text-film-amber transition-colors duration-150">
+              Groups <span class="count-badge">({u.groupCount})</span>
+            </button>
+          )}
+
+          <div class="flex items-center gap-3">
+            <button class="save-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-150">Save</button>
+            <span class="save-msg hidden text-xs text-film-muted"></span>
           </div>
         </div>
-      );
-    })}
+      </div>
+    ))}
   </div>
 
   {users.length === 0 && (
     <p class="font-serif text-xl italic text-film-faint">No users yet.</p>
   )}
 
+  <div id="group-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center px-4 py-12">
+    <div class="modal-backdrop absolute inset-0 bg-black/60"></div>
+    <div class="relative w-full max-w-md rounded-sm border border-film-border bg-film-surface p-6 shadow-xl">
+      <h3 class="mb-1 font-serif text-xl text-film-text">Assign Groups</h3>
+      <p id="gm-user" class="mb-5 text-xs tracking-widest uppercase text-film-muted"></p>
+      <div id="gm-list" class="mb-6 max-h-72 space-y-2 overflow-y-auto">
+        {groupsList.map((g) => (
+          <label class="flex cursor-pointer items-center gap-2 rounded-sm border border-film-border bg-film-surface2 px-3 py-2 text-sm text-film-text hover:border-film-amber/50 transition-colors">
+            <input type="checkbox" class="gm-cb accent-[#C9A96E]" data-group-id={g.id} />
+            <span>{g.name}</span>
+          </label>
+        ))}
+      </div>
+      {groupsList.length === 0 && (
+        <p class="mb-6 font-serif text-sm italic text-film-faint">No groups yet.</p>
+      )}
+      <div class="flex justify-end gap-3">
+        <button id="gm-close" class="cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-film-text transition-colors">Close</button>
+        <button id="gm-save" class="cursor-pointer rounded-sm border border-film-amber/50 px-3 py-1 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber/10 transition-colors">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     async function post(url: string, body: object) {
-      return fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     }
 
+    // Row save — role changes only
     document.querySelectorAll("[data-user-id]").forEach((row) => {
       const el = row as HTMLElement;
       const userId = el.dataset.userId!;
       const initRole = el.dataset.initRole!;
-      const initGroups = new Set<string>(JSON.parse(el.dataset.initGroups!));
-
       const saveBtn = el.querySelector(".save-btn")!;
       const saveMsg = el.querySelector(".save-msg") as HTMLElement;
 
@@ -119,27 +137,75 @@ for (const m of memberships) {
 
       saveBtn.addEventListener("click", async () => {
         const roleSelect = el.querySelector(".role-select") as HTMLSelectElement;
-        const checkboxes = el.querySelectorAll(".group-cb") as NodeListOf<HTMLInputElement>;
-
-        const ops: Promise<Response>[] = [];
-
-        if (roleSelect.value !== initRole) {
-          ops.push(post("/api/admin/user-groups", { action: "set-role", userId, role: roleSelect.value }));
-        }
-
-        checkboxes.forEach((cb) => {
-          const groupId = cb.dataset.groupId!;
-          const wasIn = initGroups.has(groupId);
-          if (cb.checked && !wasIn) ops.push(post("/api/admin/user-groups", { action: "add", userId, groupId }));
-          if (!cb.checked && wasIn) ops.push(post("/api/admin/user-groups", { action: "remove", userId, groupId }));
-        });
-
-        if (ops.length === 0) { showMsg("No changes", true); return; }
-
-        const results = await Promise.all(ops);
-        const allOk = results.every((r) => r.ok);
-        if (allOk) { showMsg("Saved", true); setTimeout(() => location.reload(), 800); }
+        if (roleSelect.value === initRole) { showMsg("No changes", true); return; }
+        const res = await post("/api/admin/user-groups", { action: "set-role", userId, role: roleSelect.value });
+        if (res.ok) { showMsg("Saved", true); setTimeout(() => location.reload(), 800); }
         else { showMsg("Error", false); }
+      });
+    });
+
+    // Group modal
+    const modal = document.getElementById("group-modal") as HTMLElement;
+    const gmUser = document.getElementById("gm-user") as HTMLElement;
+    const gmCbs = modal.querySelectorAll(".gm-cb") as NodeListOf<HTMLInputElement>;
+    let activeRow: HTMLElement | null = null;
+
+    function openModal(row: HTMLElement) {
+      activeRow = row;
+      gmUser.textContent = row.dataset.userName ?? "";
+      const pending = new Set<string>(JSON.parse(row.dataset.pendingGroups ?? "[]"));
+      gmCbs.forEach((cb) => { cb.checked = pending.has(cb.dataset.groupId!); });
+      modal.classList.remove("hidden");
+    }
+
+    function closeModal() { modal.classList.add("hidden"); activeRow = null; }
+
+    modal.querySelector(".modal-backdrop")!.addEventListener("click", closeModal);
+    document.getElementById("gm-close")!.addEventListener("click", closeModal);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+    document.querySelectorAll(".open-groups-btn").forEach((btn) => {
+      btn.addEventListener("click", () => openModal((btn as HTMLElement).closest("[data-user-id]") as HTMLElement));
+    });
+
+    document.getElementById("gm-save")!.addEventListener("click", async () => {
+      if (!activeRow) return;
+      const userId = activeRow.dataset.userId!;
+      const init = new Set<string>(JSON.parse(activeRow.dataset.initGroups ?? "[]"));
+      const next = new Set<string>();
+      gmCbs.forEach((cb) => { if (cb.checked) next.add(cb.dataset.groupId!); });
+
+      const ops: Promise<Response>[] = [];
+      next.forEach((gid) => { if (!init.has(gid)) ops.push(post("/api/admin/user-groups", { action: "add", userId, groupId: gid })); });
+      init.forEach((gid) => { if (!next.has(gid)) ops.push(post("/api/admin/user-groups", { action: "remove", userId, groupId: gid })); });
+
+      activeRow.dataset.pendingGroups = JSON.stringify([...next]);
+      const badge = activeRow.querySelector(".count-badge");
+      if (badge) badge.textContent = `(${next.size})`;
+      closeModal();
+
+      if (ops.length > 0) {
+        const results = await Promise.all(ops);
+        if (results.every((r) => r.ok)) location.reload();
+      }
+    });
+
+    // Manual email activation
+    document.querySelectorAll(".activate-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const row = (btn as HTMLElement).closest("[data-user-id]") as HTMLElement;
+        const userId = row.dataset.userId!;
+        (btn as HTMLButtonElement).disabled = true;
+        const res = await post("/api/admin/activate-user", { userId });
+        if (!res.ok) {
+          (btn as HTMLButtonElement).disabled = false;
+          const msg = row.querySelector(".save-msg") as HTMLElement;
+          if (msg) { msg.textContent = "Activate failed"; msg.className = "save-msg text-xs text-red-400"; msg.classList.remove("hidden"); setTimeout(() => msg.classList.add("hidden"), 2000); }
+          return;
+        }
+        const badge = row.querySelector(".verify-badge") as HTMLElement;
+        if (badge) { badge.textContent = "Verified"; badge.className = "verify-badge text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border border-film-amber/40 text-film-amber"; }
+        btn.remove();
       });
     });
   </script>
