@@ -1,11 +1,12 @@
+import { eq } from "drizzle-orm";
 import {
   canAccessRoll,
   getPrivateGrants,
-  getVisibilityMap,
   type AuthUser,
   type Visibility,
 } from "./access-control";
 import type { DB } from "./db";
+import { rolls as rollsTable } from "./db-schema";
 import { createSignedUrl } from "./signed-url-service";
 
 export interface AlbumConfig {
@@ -21,6 +22,7 @@ export interface Album extends AlbumConfig {
   slug: string;
   visibility: Visibility;
   coverUrl: string;
+  gated?: boolean;
 }
 
 export interface R2Env {
@@ -33,21 +35,18 @@ export interface R2Env {
 
 /** Derive a fallback config from the slug (e.g. "tokyo-2025-03" → title + date). */
 function configFromSlug(slug: string): AlbumConfig {
-  // Extract trailing YYYY-MM or YYYY-MM-DD from slug
   const dateMatch = slug.match(/(\d{4})-(\d{2})(?:-(\d{2}))?$/);
   const date = dateMatch
     ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3] ?? "01"}`
     : new Date().toISOString().slice(0, 10);
-
-  const title = slug
-    .replace(/-\d{4}-\d{2}(?:-\d{2})?$/, "") // strip date suffix
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase()) || slug;
-
+  const title =
+    slug
+      .replace(/-\d{4}-\d{2}(?:-\d{2})?$/, "")
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase()) || slug;
   return { title, date };
 }
 
-/** List all roll slug folders in the bucket (non-empty slugs only). */
 async function listRollSlugs(r2: R2Bucket): Promise<string[]> {
   const listing = await r2.list({ prefix: "rolls/", delimiter: "/" });
   return listing.delimitedPrefixes
@@ -55,21 +54,16 @@ async function listRollSlugs(r2: R2Bucket): Promise<string[]> {
     .filter(Boolean);
 }
 
-/** Fetch _config.json for a roll, or derive from slug if missing. */
 async function fetchConfig(r2: R2Bucket, slug: string): Promise<AlbumConfig> {
   try {
     const obj = await r2.get(`rolls/${slug}/_config.json`);
-    if (obj) {
-      const body = await obj.text();
-      return JSON.parse(body) as AlbumConfig;
-    }
+    if (obj) return JSON.parse(await obj.text()) as AlbumConfig;
   } catch {
-    // fall through to slug-derived config
+    // fall through
   }
   return configFromSlug(slug);
 }
 
-/** List all photo filenames in a roll, sorted. Excludes _config.json. */
 async function listPhotoFiles(r2: R2Bucket, slug: string): Promise<string[]> {
   const listing = await r2.list({ prefix: `rolls/${slug}/` });
   return listing.objects
@@ -79,18 +73,18 @@ async function listPhotoFiles(r2: R2Bucket, slug: string): Promise<string[]> {
 }
 
 /**
- * Determine the cover key for a roll.
- * Uses cover.jpg if it exists, otherwise falls back to the first photo.
+ * Resolve the cover key: admin-chosen DB key takes priority,
+ * then cover.jpg in R2, then first photo.
  */
 async function resolveCoverKey(
   r2: R2Bucket,
   slug: string,
   photoFilenames: string[],
+  dbCoverKey?: string | null,
 ): Promise<string | null> {
-  const coverKey = `rolls/${slug}/cover.jpg`;
-  const head = await r2.head(coverKey);
-  if (head) return coverKey;
-  // Fall back to first photo
+  if (dbCoverKey) return dbCoverKey;
+  const head = await r2.head(`rolls/${slug}/cover.jpg`);
+  if (head) return `rolls/${slug}/cover.jpg`;
   if (photoFilenames.length > 0) return `rolls/${slug}/${photoFilenames[0]}`;
   return null;
 }
@@ -102,18 +96,24 @@ export async function getAllAlbums(
   user: AuthUser | null,
 ): Promise<Album[]> {
   const slugs = await listRollSlugs(env.R2);
-  const visibilityMap = await getVisibilityMap(db);
+
+  // Single query for all roll rows (visibility + metadata)
+  const rollRows = await db.select().from(rollsTable);
+  const rollMap = new Map(rollRows.map((r) => [r.slug, r]));
+
   const privateGrants = user ? await getPrivateGrants(db, user.id) : new Set<string>();
   const isAdmin = user?.role === "admin";
 
   const albums: Album[] = [];
 
   for (const slug of slugs) {
-    const visibility = visibilityMap.get(slug) ?? "registered";
+    const dbRow = rollMap.get(slug);
+    const visibility = (dbRow?.visibility ?? "registered") as Visibility;
 
     if (!isAdmin) {
-      if (visibility === "registered" && !user) continue;
+      // private: only granted users
       if (visibility === "private" && !privateGrants.has(slug)) continue;
+      // registered: show to everyone as gated teaser (removed the skip)
     }
 
     const [config, photoFilenames] = await Promise.all([
@@ -121,15 +121,21 @@ export async function getAllAlbums(
       listPhotoFiles(env.R2, slug),
     ]);
 
-    const coverKey = await resolveCoverKey(env.R2, slug, photoFilenames);
-    if (!coverKey) continue; // skip empty rolls
+    const coverKey = await resolveCoverKey(env.R2, slug, photoFilenames, dbRow?.coverPhotoKey);
+    if (!coverKey) continue;
 
+    // DB values override _config.json values when set (conditional spreads avoid undefined with exactOptionalPropertyTypes)
     albums.push({
       ...config,
       slug,
       visibility,
       coverUrl: await createSignedUrl(env, coverKey),
-    });
+      gated: visibility === "registered" && !user,
+      ...(dbRow?.description?.trim() ? { description: dbRow.description.trim() } : {}),
+      ...(dbRow?.camera ? { camera: dbRow.camera } : {}),
+      ...(dbRow?.filmStock ? { filmStock: dbRow.filmStock } : {}),
+      ...(dbRow?.frames != null ? { frames: dbRow.frames } : {}),
+    } as Album);
   }
 
   return albums.sort((a, b) => b.date.localeCompare(a.date));
@@ -142,8 +148,9 @@ export async function getAlbum(
   user: AuthUser | null,
   slug: string,
 ): Promise<(Album & { photos: string[] }) | null> {
-  const visibilityMap = await getVisibilityMap(db);
-  const visibility = visibilityMap.get(slug) ?? "registered";
+  const rollRows = await db.select().from(rollsTable).where(eq(rollsTable.slug, slug)).limit(1);
+  const dbRow = rollRows[0];
+  const visibility = (dbRow?.visibility ?? "registered") as Visibility;
 
   const allowed = await canAccessRoll(db, user, slug, visibility);
   if (!allowed) return null;
@@ -153,10 +160,10 @@ export async function getAlbum(
     listPhotoFiles(env.R2, slug),
   ]);
 
-  const coverKey = await resolveCoverKey(env.R2, slug, photoFilenames);
+  const coverKey = await resolveCoverKey(env.R2, slug, photoFilenames, dbRow?.coverPhotoKey);
   if (!coverKey) return null;
 
-  // Exclude cover.jpg from the photo list (it's a dedicated cover, not a frame)
+  // Exclude cover.jpg from frame list (dedicated cover file, not a shot)
   const frameFilenames = photoFilenames.filter((f) => f !== "cover.jpg");
 
   const [coverUrl, ...photos] = await Promise.all([
@@ -164,5 +171,15 @@ export async function getAlbum(
     ...frameFilenames.map((f) => createSignedUrl(env, `rolls/${slug}/${f}`)),
   ]);
 
-  return { ...config, slug, visibility, coverUrl, photos };
+  return {
+    ...config,
+    slug,
+    visibility,
+    coverUrl,
+    photos,
+    ...(dbRow?.description?.trim() ? { description: dbRow.description.trim() } : {}),
+    ...(dbRow?.camera ? { camera: dbRow.camera } : {}),
+    ...(dbRow?.filmStock ? { filmStock: dbRow.filmStock } : {}),
+    ...(dbRow?.frames != null ? { frames: dbRow.frames } : {}),
+  } as Album & { photos: string[] };
 }

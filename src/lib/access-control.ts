@@ -61,16 +61,6 @@ export async function canAccessRoll(
   return viaGroup.length > 0;
 }
 
-/** Bulk visibility lookup — returns a map of slug → visibility. */
-export async function getVisibilityMap(
-  db: DB,
-): Promise<Map<string, Visibility>> {
-  const rows = await db
-    .select({ slug: rolls.slug, visibility: rolls.visibility })
-    .from(rolls);
-  return new Map(rows.map((r) => [r.slug, r.visibility as Visibility]));
-}
-
 /**
  * Bulk access lookup for a single user.
  * Returns set of private roll slugs visible to the user

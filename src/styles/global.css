@@ -1,37 +1,91 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@300;400&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Paper / light theme tokens (default) */
+:root {
+  --bg:       #F4F1EA;
+  --surface:  #EAE5DB;
+  --surface2: #E0DACE;
+  --border:   #D6CFC0;
+  --hairline: rgba(28,24,18,0.12);
+  --text:     #1C1812;
+  --muted:    #6B6359;
+  --faint:    #B5AC9C;
+  --amber:    #A07B3A;
+  --amber-soft: rgba(160,123,58,0.14);
+}
+
 @layer base {
   body {
-    @apply bg-film-bg text-film-text antialiased;
+    background-color: var(--bg);
+    color: var(--text);
     font-family: "DM Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4 {
     font-family: "Cormorant Garamond", Georgia, serif;
-    font-weight: 400;
-    letter-spacing: 0.01em;
+    font-weight: 300;
+    letter-spacing: 0.005em;
+  }
+
+  ::selection {
+    background: var(--amber-soft);
+    color: var(--text);
   }
 }
 
-/* Subtle film grain overlay */
+/* Subtle film grain overlay — multiplied for paper, lifts texture without darkening */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: 0.03;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 200px 200px;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0C0B0A; }
-::-webkit-scrollbar-thumb { background: #2C2820; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3A3530; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(28,24,18,0.18); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(28,24,18,0.32); }
+
+/* Reusable utilities */
+.smallcaps {
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hairline { background: var(--hairline); }
+
+/* Section divider with centered label */
+.sec-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 80px 0 32px;
+}
+.sec-head .line { height: 1px; background: var(--hairline); }
+.sec-head .label {
+  font-size: 10.5px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Page fade-in */
+.page { animation: page-in 0.5s ease; }
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}

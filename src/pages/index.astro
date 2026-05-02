@@ -24,60 +24,114 @@ if (env?.R2 && env?.DB) {
   fetchError = true;
 }
 
+// Most recent roll = featured hero
+const featured = albums[0];
+const indexAlbums = albums; // include featured in the index too
+
+// Number rolls in reverse-chronological order (most recent = highest number)
+const total = albums.length;
+const rollNum = (i: number) => `R-${String(total - i).padStart(3, "0")}`;
+
 // Extract sorted unique years for year-filter pills
-const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) =>
+  b.localeCompare(a),
+);
+
+const featuredDate = featured
+  ? new Date(featured.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  : "";
+
+const featuredTitleParts = featured ? featured.title.split(",") : ["", ""];
 ---
 
 <BaseLayout>
   {albums.length > 0 ? (
     <>
-      <!-- Search + filter bar -->
-      <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="relative max-w-xs flex-1">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-film-faint" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      {/* HERO — featured roll */}
+      {featured && (
+        <section class="hero relative overflow-hidden border-b border-film-hairline -mx-8 sm:-mx-8 -mx-5 -mt-10 mb-0" style="height: 78vh; min-height: 560px; max-height: 760px;">
+          <div
+            class="hero-img absolute inset-0 bg-cover bg-center"
+            style={`background-image: url(${featured.coverUrl}); transform: scale(1.02); filter: saturate(.92) contrast(1.02);`}
+          />
+          <div
+            class="hero-veil absolute inset-0"
+            style="background: linear-gradient(to bottom, color-mix(in oklab, var(--bg) 30%, transparent) 0%, transparent 30%, transparent 50%, color-mix(in oklab, var(--bg) 88%, transparent) 100%), linear-gradient(to right, color-mix(in oklab, var(--bg) 70%, transparent) 0%, transparent 50%);"
+          />
+          <div class="relative h-full flex flex-col justify-end pb-16 mx-auto max-w-[1280px] px-8 sm:px-8 px-5">
+            <div class="flex items-center gap-3.5 mb-4">
+              <span class="w-1.5 h-1.5 bg-film-amber rounded-full inline-block" />
+              <span class="smallcaps">Featured roll · {rollNum(0)}</span>
+            </div>
+            <h2 class="font-serif font-light leading-[0.98] tracking-[-0.012em] text-film-text m-0 max-w-[14ch]" style="font-size: clamp(48px, 7vw, 96px); text-wrap: balance;">
+              {featuredTitleParts[0]}{featuredTitleParts[1] ? "," : ""}
+              {featuredTitleParts[1] && (<><br /><em class="italic text-film-amber font-light">{featuredTitleParts.slice(1).join(",").trim()}</em></>)}
+            </h2>
+            <div class="flex flex-wrap mt-6 text-film-muted text-xs tracking-[0.18em] uppercase">
+              <span class="pr-4 border-r border-film-hairline">{featuredDate}</span>
+              {featured.filmStock && <span class="px-4 border-r border-film-hairline">{featured.filmStock}</span>}
+              {featured.camera && <span class="px-4 border-r border-film-hairline">{featured.camera}</span>}
+              {featured.frames && <span class="pl-4">{featured.frames} frames</span>}
+            </div>
+            <a
+              href={`/rolls/${featured.slug}`}
+              class="hero-cta absolute right-8 sm:right-8 right-5 bottom-16 flex items-center gap-3 text-film-text no-underline text-[11.5px] tracking-[0.22em] uppercase group"
+            >
+              View the roll
+              <span class="arrow w-10 h-10 border border-film-hairline rounded-full grid place-items-center transition-all duration-300 group-hover:border-film-amber group-hover:text-film-amber">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M5 12h14M13 5l7 7-7 7" />
+                </svg>
+              </span>
+            </a>
+          </div>
+        </section>
+      )}
+
+      {/* SECTION DIVIDER */}
+      <div class="sec-head">
+        <div class="line" />
+        <span class="label">The Index</span>
+        <div class="line" />
+      </div>
+
+      {/* Search + filter bar */}
+      <div class="toolbar flex items-center justify-between gap-6 flex-wrap pb-8">
+        <div class="search relative flex-[0_0_320px]">
+          <svg class="absolute left-0 top-1/2 -translate-y-1/2 text-film-faint" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
           <input
             id="search-input"
             type="search"
-            placeholder="Search rolls…"
+            placeholder="Search rolls, places, stocks…"
             autocomplete="off"
-            class="w-full rounded-sm border border-film-border bg-film-surface pl-9 pr-3 py-2 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
+            class="w-full bg-transparent border-0 border-b border-film-hairline text-film-text pl-6 pr-0 py-2.5 text-sm focus:outline-none focus:border-b-film-amber transition-colors duration-200 placeholder:italic placeholder:text-film-faint"
           />
         </div>
 
         {years.length > 1 && (
-          <div class="flex flex-wrap items-center gap-2" id="year-filters">
-            <button
-              class="year-btn active cursor-pointer rounded-sm border px-3 py-1 text-xs tracking-widest uppercase transition-all duration-150"
-              data-year="all"
-            >
-              All
-            </button>
+          <div class="filters flex gap-1.5 items-center" id="year-filters">
+            <button class="chip active" data-year="all">All</button>
             {years.map((y) => (
-              <button
-                class="year-btn cursor-pointer rounded-sm border px-3 py-1 text-xs tracking-widest uppercase transition-all duration-150"
-                data-year={y}
-              >
-                {y}
-              </button>
+              <button class="chip" data-year={y}>{y}</button>
             ))}
           </div>
         )}
       </div>
 
-      <!-- Roll count indicator -->
-      <p id="result-count" class="mb-6 text-xs tracking-widest uppercase text-film-faint">
-        {albums.length} {albums.length === 1 ? "roll" : "rolls"}
+      <p id="result-count" class="count text-[10.5px] tracking-[0.26em] uppercase text-film-faint pb-6">
+        {albums.length} rolls · {albums.reduce((a, r) => a + (r.frames ?? 0), 0)} frames archived
       </p>
 
-      <!-- Album grid -->
-      <div id="album-grid" class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        {albums.map((album) => (
+      {/* CARD GRID */}
+      <div id="album-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+        {indexAlbums.map((album, i) => (
           <div
             class="album-item"
             data-title={album.title.toLowerCase()}
             data-film-stock={(album.filmStock ?? "").toLowerCase()}
+            data-camera={(album.camera ?? "").toLowerCase()}
             data-year={album.date.slice(0, 4)}
           >
             <AlbumCard
@@ -85,21 +139,23 @@ const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) =>
               title={album.title}
               date={album.date}
               filmStock={album.filmStock}
+              camera={album.camera}
               coverUrl={album.coverUrl}
+              num={rollNum(i)}
               visibility={album.visibility}
+              gated={album.gated}
             />
           </div>
         ))}
       </div>
 
-      <!-- Empty filter state -->
-      <p id="no-results" class="hidden py-20 text-center font-serif text-2xl italic text-film-faint">
+      <p id="no-results" class="hidden py-20 text-center font-serif italic text-2xl text-film-faint">
         No rolls match your search.
       </p>
     </>
   ) : (
     <div class="py-24 text-center">
-      <p class="font-serif text-2xl text-film-faint italic">
+      <p class="font-serif italic text-2xl text-film-faint">
         {fetchError
           ? "Storage not configured."
           : user
@@ -107,7 +163,7 @@ const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) =>
           : "No public albums yet."}
       </p>
       {!user && !fetchError && (
-        <a href="/login" class="mt-4 inline-block text-xs tracking-widest uppercase text-film-amber hover:text-film-amber-hover transition-colors duration-200">
+        <a href="/login" class="mt-4 inline-block text-[11.5px] tracking-[0.22em] uppercase text-film-amber hover:text-film-amber-hover transition-colors duration-200">
           Log in to see more
         </a>
       )}
@@ -116,24 +172,28 @@ const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) =>
 </BaseLayout>
 
 <style>
-  .year-btn {
-    border-color: theme(colors.film.border);
-    color: theme(colors.film.muted);
+  .chip {
+    background: none;
+    border: 0;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
   }
-  .year-btn:hover {
-    border-color: rgb(201 169 110 / 0.4);
-    color: theme(colors.film.amber);
-  }
-  .year-btn.active {
-    border-color: rgb(201 169 110 / 0.6);
-    color: theme(colors.film.amber);
-    background-color: rgb(201 169 110 / 0.08);
+  .chip:hover { color: var(--text); }
+  .chip.active {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
   }
 </style>
 
-<script define:vars={{ totalCount: albums.length }}>
+<script define:vars={{ totalCount: albums.length, totalFrames: albums.reduce((a, r) => a + (r.frames ?? 0), 0) }}>
   const searchInput = document.getElementById("search-input");
-  const yearBtns = document.querySelectorAll(".year-btn");
+  const yearBtns = document.querySelectorAll(".chip");
   const items = document.querySelectorAll(".album-item");
   const resultCount = document.getElementById("result-count");
   const noResults = document.getElementById("no-results");
@@ -144,28 +204,31 @@ const years = [...new Set(albums.map((a) => a.date.slice(0, 4)))].sort((a, b) =>
 
   function applyFilters() {
     let visible = 0;
-
     items.forEach((item) => {
-      const el = item;
-      const title = el.dataset.title ?? "";
-      const filmStock = el.dataset.filmStock ?? "";
-      const year = el.dataset.year ?? "";
+      const title = item.dataset.title ?? "";
+      const filmStock = item.dataset.filmStock ?? "";
+      const camera = item.dataset.camera ?? "";
+      const year = item.dataset.year ?? "";
 
       const matchesYear = activeYear === "all" || year === activeYear;
-      const matchesSearch = !searchQuery || title.includes(searchQuery) || filmStock.includes(searchQuery);
+      const matchesSearch =
+        !searchQuery ||
+        title.includes(searchQuery) ||
+        filmStock.includes(searchQuery) ||
+        camera.includes(searchQuery);
 
       if (matchesYear && matchesSearch) {
-        el.style.display = "";
+        item.style.display = "";
         visible++;
       } else {
-        el.style.display = "none";
+        item.style.display = "none";
       }
     });
 
-    const label = visible === 1 ? "roll" : "rolls";
-    resultCount.textContent = visible === totalCount
-      ? `${totalCount} ${label}`
-      : `${visible} of ${totalCount} ${label}`;
+    resultCount.textContent =
+      visible === totalCount
+        ? `${totalCount} rolls · ${totalFrames} frames archived`
+        : `${visible} of ${totalCount} rolls`;
 
     noResults.classList.toggle("hidden", visible > 0);
     grid.classList.toggle("hidden", visible === 0);

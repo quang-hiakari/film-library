@@ -1,48 +1,55 @@
 ---
 interface Props {
   photos: string[];
+  title?: string;
+  stock?: string;
 }
 
-const { photos } = Astro.props;
+const { photos, title, stock } = Astro.props;
 ---
 
 <div
   id="lightbox"
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95 backdrop-blur-sm"
+  class="lb fixed inset-0 z-[90] hidden items-center justify-center"
+  style="background: color-mix(in oklab, var(--bg) 96%, black); backdrop-filter: blur(8px);"
 >
   <button
     id="lb-close"
-    class="absolute right-5 top-5 cursor-pointer text-film-muted hover:text-film-text transition-colors duration-150"
+    class="absolute top-6 right-6 bg-transparent border-0 text-film-muted hover:text-film-amber cursor-pointer transition-colors duration-200"
     aria-label="Close"
   >
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   </button>
 
   <button
     id="lb-prev"
-    class="absolute left-4 top-1/2 -translate-y-1/2 cursor-pointer text-film-muted hover:text-film-amber transition-colors duration-150 p-2"
+    class="absolute left-6 top-1/2 -translate-y-1/2 bg-transparent border-0 text-film-muted hover:text-film-amber cursor-pointer transition-colors duration-200"
     aria-label="Previous"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="15 18 9 12 15 6"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 18 9 12l6-6" />
     </svg>
   </button>
 
   <button
     id="lb-next"
-    class="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-film-muted hover:text-film-amber transition-colors duration-150 p-2"
+    class="absolute right-6 top-1/2 -translate-y-1/2 bg-transparent border-0 text-film-muted hover:text-film-amber cursor-pointer transition-colors duration-200"
     aria-label="Next"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m9 6 6 6-6 6" />
     </svg>
   </button>
 
-  <img id="lb-img" class="max-h-[88vh] max-w-[88vw] object-contain" alt="" />
+  <img id="lb-img" class="max-w-[88vw] max-h-[84vh] object-contain shadow-[0_30px_80px_rgba(0,0,0,0.6)]" alt="" />
 
-  <span id="lb-counter" class="absolute bottom-5 left-1/2 -translate-x-1/2 text-xs tracking-widest text-film-muted font-mono"></span>
+  <div class="absolute left-1/2 -translate-x-1/2 bottom-7 flex items-center gap-4.5 font-mono text-[11px] tracking-[0.14em] text-film-muted">
+    <span id="lb-counter"></span>
+    {stock && (<><span class="w-1 h-1 bg-film-faint rounded-full" /><span>{stock}</span></>)}
+    {title && (<><span class="w-1 h-1 bg-film-faint rounded-full" /><span>{title}</span></>)}
+  </div>
 </div>
 
 <script define:vars={{ photos }}>

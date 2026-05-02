@@ -15,6 +15,13 @@
       "when": 1777546078090,
       "tag": "0001_little_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1777727744259,
+      "tag": "0002_great_slapstick",
+      "breakpoints": true
     }
   ]
 }

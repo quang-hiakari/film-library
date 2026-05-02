@@ -1,7 +1,9 @@
 ---
 import BaseLayout from "../../../layouts/base-layout.astro";
+import AdminCoverPicker from "../../../components/admin-cover-picker.astro";
 import { getDb } from "../../../lib/db";
 import { groups, rollAccess, rollGroupAccess, rolls, user as userTable } from "../../../lib/db-schema";
+import { createSignedUrl } from "../../../lib/signed-url-service";
 import { eq } from "drizzle-orm";
 
 export const prerender = false;
@@ -12,7 +14,8 @@ if (!currentUser || currentUser.role !== "admin") return Astro.redirect("/");
 const { slug } = Astro.params;
 if (!slug) return Astro.redirect("/admin");
 
-const db = getDb(Astro.locals.runtime.env.DB);
+const env = Astro.locals.runtime.env;
+const db = getDb(env.DB);
 
 const [rollRow, grants, allGroups, groupGrants] = await Promise.all([
   db.select().from(rolls).where(eq(rolls.slug, slug)).limit(1),
@@ -25,7 +28,18 @@ const [rollRow, grants, allGroups, groupGrants] = await Promise.all([
     .where(eq(rollGroupAccess.rollSlug, slug)),
 ]);
 
-const visibility = rollRow[0]?.visibility ?? "registered";
+const row = rollRow[0];
+const visibility = row?.visibility ?? "registered";
+
+const photoList = await env.R2.list({ prefix: `rolls/${slug}/` });
+const photoKeys = photoList.objects
+  .map((o) => o.key)
+  .filter((k) => /\.(jpe?g|png|webp)$/i.test(k))
+  .sort();
+const photos = await Promise.all(
+  photoKeys.map(async (key) => ({ key, url: await createSignedUrl(env, key) }))
+);
+
 const grantedGroupIds = new Set(groupGrants.map((g) => g.id));
 const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
 ---
@@ -44,64 +58,92 @@ const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
     </p>
   </header>
 
+  <!-- Roll Info -->
+  <section class="mb-10">
+    <h3 class="mb-4 text-xs tracking-widest uppercase text-film-muted">Roll Info</h3>
+    <form id="info-form" class="space-y-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Film Stock</label>
+          <input name="filmStock" type="text" value={row?.filmStock ?? ""}
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text focus:border-film-amber/50 focus:outline-none transition-colors" />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Camera</label>
+          <input name="camera" type="text" value={row?.camera ?? ""}
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text focus:border-film-amber/50 focus:outline-none transition-colors" />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Frames</label>
+          <input name="frames" type="number" min="0" value={row?.frames ?? ""}
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text focus:border-film-amber/50 focus:outline-none transition-colors" />
+        </div>
+      </div>
+      <div>
+        <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Description</label>
+        <textarea name="description" rows="3"
+          class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text focus:border-film-amber/50 focus:outline-none transition-colors"
+        >{row?.description ?? ""}</textarea>
+      </div>
+      <div class="flex items-center gap-3">
+        <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-4 py-2 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">Save</button>
+        <span id="info-msg" class="hidden text-xs"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- Cover Photo -->
+  <section class="mb-12">
+    <h3 class="mb-2 text-xs tracking-widest uppercase text-film-muted">Cover Photo</h3>
+    <p class="mb-3 text-xs text-film-faint">Click a photo to set as cover.</p>
+    <AdminCoverPicker photos={photos} currentCover={row?.coverPhotoKey ?? null} />
+    <p id="cover-msg" class="mt-2 hidden text-xs"></p>
+  </section>
+
+  <!-- User Access -->
   <section class="mb-12">
     <h3 class="mb-5 text-xs tracking-widest uppercase text-film-muted">User Access</h3>
-
     {grants.length > 0 ? (
       <ul class="mb-6 space-y-2">
         {grants.map((g) => (
           <li class="flex items-center justify-between rounded-sm border border-film-border bg-film-surface px-4 py-3 text-sm">
-            <span class="text-film-text">
-              {g.name}
-              <span class="ml-2 text-xs text-film-muted">{g.email}</span>
-            </span>
-            <button class="remove-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150" data-email={g.email}>
-              Remove
-            </button>
+            <span class="text-film-text">{g.name}<span class="ml-2 text-xs text-film-muted">{g.email}</span></span>
+            <button class="remove-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150" data-email={g.email}>Remove</button>
           </li>
         ))}
       </ul>
     ) : (
       <p class="mb-6 font-serif text-lg italic text-film-faint">No users invited yet.</p>
     )}
-
     <form id="invite-form" class="flex gap-3">
       <input id="invite-email" type="email" required placeholder="user@example.com"
-        class="flex-1 rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200"
-      />
-      <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">
-        Invite
-      </button>
+        class="flex-1 rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200" />
+      <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">Invite</button>
     </form>
     <p id="invite-msg" class="mt-2 hidden text-xs"></p>
   </section>
 
+  <!-- Group Access -->
   <section>
     <h3 class="mb-5 text-xs tracking-widest uppercase text-film-muted">Group Access</h3>
-
     {groupGrants.length > 0 ? (
       <ul class="mb-6 space-y-2">
         {groupGrants.map((g) => (
           <li class="flex items-center justify-between rounded-sm border border-film-border bg-film-surface px-4 py-3 text-sm">
             <span class="text-film-text">{g.name}</span>
-            <button class="remove-group-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150" data-group-id={g.id}>
-              Remove
-            </button>
+            <button class="remove-group-btn cursor-pointer text-xs tracking-widest uppercase text-film-muted hover:text-red-400 transition-colors duration-150" data-group-id={g.id}>Remove</button>
           </li>
         ))}
       </ul>
     ) : (
       <p class="mb-6 font-serif text-lg italic text-film-faint">No groups invited yet.</p>
     )}
-
     {availableGroups.length > 0 && (
       <form id="invite-group-form" class="flex gap-3">
         <select id="invite-group-select" class="flex-1 max-w-xs cursor-pointer rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text focus:border-film-amber/50 focus:outline-none">
           {availableGroups.map((g) => <option value={g.id}>{g.name}</option>)}
         </select>
-        <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">
-          Invite Group
-        </button>
+        <button type="submit" class="cursor-pointer rounded-sm border border-film-amber/60 px-5 py-2.5 text-xs tracking-widest uppercase text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200">Invite Group</button>
       </form>
     )}
     {allGroups.length === 0 && (
@@ -110,60 +152,66 @@ const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
   </section>
 
   <script define:vars={{ slug }}>
-    const msg = document.getElementById("invite-msg");
-
-    function showMsg(text, isError) {
-      msg.textContent = text;
-      msg.className = `mt-2 text-xs ${isError ? "text-red-400" : "text-film-amber"}`;
-      msg.classList.remove("hidden");
-      setTimeout(() => msg.classList.add("hidden"), 3000);
+    function showMsg(el, text, ok) {
+      if (!el) return;
+      el.textContent = text;
+      el.className = `text-xs ${ok ? "text-film-amber" : "text-red-400"}`;
+      el.classList.remove("hidden");
+      setTimeout(() => el.classList.add("hidden"), 2500);
+    }
+    async function post(url, body) {
+      return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     }
 
-    async function callUserApi(email, action) {
-      return fetch("/api/admin/roll-access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rollSlug: slug, userEmail: email, action }),
+    document.getElementById("info-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.currentTarget);
+      const framesVal = fd.get("frames");
+      const res = await post("/api/admin/update-roll", {
+        slug,
+        filmStock: fd.get("filmStock") || null,
+        camera: fd.get("camera") || null,
+        frames: framesVal ? Number(framesVal) : null,
+        description: fd.get("description") || null,
       });
-    }
+      showMsg(document.getElementById("info-msg"), res.ok ? "Saved" : "Error", res.ok);
+    });
 
-    async function callGroupApi(groupId, action) {
-      return fetch("/api/admin/roll-group-access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rollSlug: slug, groupId, action }),
+    document.querySelectorAll(".cover-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const res = await post("/api/admin/update-roll", { slug, coverPhotoKey: btn.dataset.coverKey });
+        if (res.ok) {
+          document.querySelectorAll(".cover-btn").forEach((b) => { b.classList.remove("border-film-amber"); b.classList.add("border-transparent"); });
+          btn.classList.remove("border-transparent"); btn.classList.add("border-film-amber");
+          showMsg(document.getElementById("cover-msg"), "Cover updated", true);
+        } else showMsg(document.getElementById("cover-msg"), "Error", false);
       });
-    }
+    });
 
+    const inviteMsg = document.getElementById("invite-msg");
     document.getElementById("invite-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("invite-email").value;
-      const res = await callUserApi(email, "add");
-      if (res.ok) { showMsg(`Invited ${email}`, false); setTimeout(() => location.reload(), 800); }
-      else { const d = await res.json().catch(() => ({})); showMsg(d.error || "Failed", true); }
+      const res = await post("/api/admin/roll-access", { rollSlug: slug, userEmail: email, action: "add" });
+      if (res.ok) { showMsg(inviteMsg, `Invited ${email}`, true); setTimeout(() => location.reload(), 800); }
+      else { const d = await res.json().catch(() => ({})); showMsg(inviteMsg, d.error || "Failed", false); }
     });
-
     document.querySelectorAll(".remove-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const res = await callUserApi(btn.dataset.email, "remove");
-        if (res.ok) { showMsg(`Removed`, false); setTimeout(() => location.reload(), 800); }
-        else showMsg("Failed", true);
+        const res = await post("/api/admin/roll-access", { rollSlug: slug, userEmail: btn.dataset.email, action: "remove" });
+        if (res.ok) { showMsg(inviteMsg, "Removed", true); setTimeout(() => location.reload(), 800); }
+        else showMsg(inviteMsg, "Failed", false);
       });
     });
-
     document.getElementById("invite-group-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const groupId = document.getElementById("invite-group-select").value;
-      const res = await callGroupApi(groupId, "add");
-      if (res.ok) location.reload();
-      else showMsg("Failed to add group", true);
+      const res = await post("/api/admin/roll-group-access", { rollSlug: slug, groupId: document.getElementById("invite-group-select").value, action: "add" });
+      if (res.ok) location.reload(); else showMsg(inviteMsg, "Failed to add group", false);
     });
-
     document.querySelectorAll(".remove-group-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const res = await callGroupApi(btn.dataset.groupId, "remove");
-        if (res.ok) location.reload();
-        else showMsg("Failed to remove group", true);
+        const res = await post("/api/admin/roll-group-access", { rollSlug: slug, groupId: btn.dataset.groupId, action: "remove" });
+        if (res.ok) location.reload(); else showMsg(inviteMsg, "Failed to remove group", false);
       });
     });
   </script>

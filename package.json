@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "dev:cf": "npm run build && wrangler pages dev ./dist",
-    "dev:remote": "npm run build && wrangler pages dev ./dist --remote",
+    "dev:remote": "npm run build && wrangler pages deploy ./dist --project-name film-library --branch preview",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 execute film-library --local",
     "db:migrate:remote": "wrangler d1 execute film-library --remote",
+    "r2:sync:local": "node scripts/sync-r2-to-local.mjs",
     "r2:put:local": "wrangler r2 object put",
     "wrangler:login": "wrangler login",
     "wrangler:whoami": "wrangler whoami"

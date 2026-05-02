@@ -70,6 +70,11 @@ export const rolls = sqliteTable("rolls", {
   })
     .notNull()
     .default("registered"),
+  description: text("description"),
+  coverPhotoKey: text("cover_photo_key"),
+  camera: text("camera"),
+  filmStock: text("film_stock"),
+  frames: integer("frames"),
 });
 
 /** Grants a specific user access to a private roll. */

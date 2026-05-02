@@ -1,7 +1,6 @@
 import type { APIRoute } from "astro";
 import { getDb } from "../../../lib/db";
 import { rolls } from "../../../lib/db-schema";
-import { eq } from "drizzle-orm";
 
 export const prerender = false;
 
@@ -13,17 +12,48 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
 
-  const { slug, visibility } = await request.json();
-  if (!slug || !VALID_VISIBILITY.includes(visibility)) {
-    return new Response(JSON.stringify({ error: "Invalid input" }), { status: 400 });
+  let body: {
+    slug?: string;
+    visibility?: string;
+    description?: string | null;
+    coverPhotoKey?: string | null;
+    camera?: string | null;
+    filmStock?: string | null;
+    frames?: number | null;
+  };
+  try { body = await request.json(); } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
+  }
+
+  const { slug } = body;
+  if (!slug) return new Response(JSON.stringify({ error: "slug required" }), { status: 400 });
+  if (body.visibility && !VALID_VISIBILITY.includes(body.visibility)) {
+    return new Response(JSON.stringify({ error: "Invalid visibility" }), { status: 400 });
+  }
+  if (body.coverPhotoKey) {
+    const k = body.coverPhotoKey;
+    if (!k.startsWith(`rolls/${slug}/`) || k.includes("..") || !/\.(jpe?g|png|webp)$/i.test(k)) {
+      return new Response(JSON.stringify({ error: "Invalid coverPhotoKey" }), { status: 400 });
+    }
+  }
+
+  const set: Record<string, unknown> = {};
+  if (body.visibility !== undefined) set.visibility = body.visibility;
+  if (body.description !== undefined) set.description = body.description || null;
+  if (body.coverPhotoKey !== undefined) set.coverPhotoKey = body.coverPhotoKey;
+  if (body.camera !== undefined) set.camera = body.camera || null;
+  if (body.filmStock !== undefined) set.filmStock = body.filmStock || null;
+  if (body.frames !== undefined) set.frames = body.frames ?? null;
+
+  if (Object.keys(set).length === 0) {
+    return new Response(JSON.stringify({ error: "no fields to update" }), { status: 400 });
   }
 
   const db = getDb(locals.runtime.env.DB);
-
   await db
     .insert(rolls)
-    .values({ slug, visibility })
-    .onConflictDoUpdate({ target: rolls.slug, set: { visibility } });
+    .values({ slug, visibility: (body.visibility as "public" | "registered" | "private") ?? "registered", ...set })
+    .onConflictDoUpdate({ target: rolls.slug, set });
 
   return new Response(JSON.stringify({ ok: true }));
 };

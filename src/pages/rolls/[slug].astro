@@ -2,7 +2,7 @@
 import BaseLayout from "../../layouts/base-layout.astro";
 import PhotoGrid from "../../components/photo-grid.astro";
 import PhotoLightbox from "../../components/photo-lightbox.astro";
-import { getAlbum } from "../../lib/album-service";
+import { getAlbum, getAllAlbums } from "../../lib/album-service";
 import { getDb } from "../../lib/db";
 
 export const prerender = false;
@@ -23,6 +23,12 @@ if (!album) {
   return new Response(null, { status: 403, statusText: "Forbidden" });
 }
 
+// Compute roll number based on position in full list (most recent = highest)
+const allAlbums = await getAllAlbums(env as any, db, user);
+const idx = allAlbums.findIndex((a) => a.slug === slug);
+const total = allAlbums.length;
+const num = idx >= 0 ? `R-${String(total - idx).padStart(3, "0")}` : "";
+
 const displayDate = new Date(album.date).toLocaleDateString("en-US", {
   month: "long",
   year: "numeric",
@@ -30,25 +36,59 @@ const displayDate = new Date(album.date).toLocaleDateString("en-US", {
 ---
 
 <BaseLayout title={`${album.title} — Film Library`}>
-  <div class="mb-8">
-    <a href="/" class="text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-200">
-      &larr; Library
+  <div class="roll-head grid grid-cols-1 gap-8 pt-16 pb-12 border-b border-film-hairline">
+    <a href="/" class="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-film-muted hover:text-film-amber no-underline transition-colors duration-200 w-fit">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M19 12H5M12 19l-7-7 7-7" />
+      </svg>
+      The Index
     </a>
+
+    <div class="flex items-baseline gap-6 flex-wrap">
+      {num && <span class="font-mono text-xs tracking-[0.14em] text-film-muted">{num}</span>}
+      <h1 class="roll-title font-serif font-light leading-[1] tracking-[-0.012em] text-film-text m-0" style="font-size: clamp(40px, 6vw, 80px);">
+        {album.title}
+      </h1>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-2">
+      <div class="flex flex-col gap-1.5">
+        <span class="text-[10px] tracking-[0.26em] uppercase text-film-faint">Exposed</span>
+        <span class="text-sm text-film-text">{displayDate}</span>
+      </div>
+      {album.filmStock && (
+        <div class="flex flex-col gap-1.5">
+          <span class="text-[10px] tracking-[0.26em] uppercase text-film-faint">Stock</span>
+          <span class="text-sm text-film-text">{album.filmStock}</span>
+        </div>
+      )}
+      {album.camera && (
+        <div class="flex flex-col gap-1.5">
+          <span class="text-[10px] tracking-[0.26em] uppercase text-film-faint">Camera</span>
+          <span class="text-sm text-film-text">{album.camera}</span>
+        </div>
+      )}
+      <div class="flex flex-col gap-1.5">
+        <span class="text-[10px] tracking-[0.26em] uppercase text-film-faint">Frames</span>
+        <span class="text-sm text-film-text">
+          {album.photos.length}{album.frames ? ` of ${album.frames}` : ""}
+        </span>
+      </div>
+    </div>
+
+    {album.description && (
+      <p class="max-w-[60ch] text-[15px] leading-[1.7] text-film-muted m-0" style="text-wrap: pretty;">
+        {album.description}
+      </p>
+    )}
   </div>
 
-  <header class="mb-10 border-b border-film-border pb-8">
-    <h1 class="font-serif text-4xl font-light text-film-text">{album.title}</h1>
-    <p class="mt-2 text-xs tracking-widest uppercase text-film-muted">
-      {displayDate}
-      {album.filmStock && <span class="text-film-faint"> · {album.filmStock}</span>}
-      {album.camera && <span class="text-film-faint"> · {album.camera}</span>}
-      {album.frames && <span class="text-film-faint"> · {album.frames} frames</span>}
-    </p>
-    {album.description && (
-      <p class="mt-4 max-w-2xl text-sm leading-relaxed text-film-muted">{album.description}</p>
-    )}
-  </header>
+  <div class="sec-head" style="padding-top: 56px;">
+    <div class="line" />
+    <span class="label">Contact Sheet</span>
+    <div class="line" />
+  </div>
 
-  <PhotoGrid photos={album.photos} />
-  <PhotoLightbox photos={album.photos} />
+  <PhotoGrid photos={album.photos} totalFrames={album.frames} />
+  <PhotoLightbox photos={album.photos} title={album.title} stock={album.filmStock} />
 </BaseLayout>

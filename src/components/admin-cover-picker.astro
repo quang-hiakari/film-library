@@ -1,0 +1,22 @@
+---
+interface Props {
+  photos: { key: string; url: string }[];
+  currentCover: string | null;
+}
+const { photos, currentCover } = Astro.props;
+---
+
+<div class="grid grid-cols-4 gap-2 sm:grid-cols-6">
+  {photos.map((p) => (
+    <button
+      type="button"
+      class={`cover-btn overflow-hidden rounded-sm border-2 transition-colors duration-150 ${p.key === currentCover ? "border-film-amber" : "border-transparent hover:border-film-border"}`}
+      data-cover-key={p.key}
+    >
+      <img src={p.url} alt="" loading="lazy" class="aspect-[3/2] w-full object-cover" />
+    </button>
+  ))}
+</div>
+{photos.length === 0 && (
+  <p class="font-serif text-sm italic text-film-faint">No photos in this roll yet.</p>
+)}

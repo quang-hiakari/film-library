@@ -24,35 +24,54 @@ const isAdmin = user?.role === "admin";
     <title>{title}</title>
   </head>
   <body class="min-h-screen flex flex-col">
-    <header class="border-b border-film-border px-6 py-5">
-      <div class="mx-auto flex max-w-6xl items-center justify-between">
-        <a href="/" class="font-serif text-xl tracking-wide text-film-text hover:text-film-amber transition-colors duration-200">
-          Film Library
+    <header class="nav sticky top-0 z-40 border-b border-film-hairline">
+      <div class="mx-auto max-w-[1280px] px-8 sm:px-8 px-5 flex items-center justify-between py-4">
+        <a href="/" class="wordmark group flex items-center gap-3 text-film-text no-underline">
+          <span class="mark inline-block text-film-text transition-transform duration-700 group-hover:rotate-[40deg]" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="16" cy="16" r="13.25" />
+              <circle cx="16" cy="16" r="8" />
+              <path d="M24.25 16 L29.25 16" />
+              <path d="M24.25 14.5 L29.25 14.5" />
+              <circle cx="16" cy="16" r="1.6" fill="currentColor" stroke="none" />
+              <circle cx="16" cy="5.25" r=".75" fill="currentColor" stroke="none" />
+              <circle cx="23.6" cy="8.4" r=".75" fill="currentColor" stroke="none" />
+              <circle cx="23.6" cy="23.6" r=".75" fill="currentColor" stroke="none" />
+              <circle cx="16" cy="26.75" r=".75" fill="currentColor" stroke="none" />
+              <circle cx="8.4" cy="23.6" r=".75" fill="currentColor" stroke="none" />
+              <circle cx="8.4" cy="8.4" r=".75" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <h1 class="font-serif text-xl tracking-[0.04em] m-0 self-baseline font-light">Film Library</h1>
+          <span class="self-baseline text-[9.5px] tracking-[0.28em] uppercase text-film-muted ml-1">est. 2021</span>
         </a>
-        <nav class="flex items-center gap-6 text-sm">
+        <nav class="flex items-center gap-7">
+          <a href="/" class="text-[11.5px] font-medium tracking-[0.18em] uppercase text-film-muted hover:text-film-text transition-colors duration-200">
+            Index
+          </a>
           {user ? (
             <>
-              <span class="text-film-muted">{user.name}</span>
+              <span class="text-[11.5px] tracking-[0.18em] uppercase text-film-muted">{user.name}</span>
               {isAdmin && (
-                <a href="/admin" class="text-film-muted hover:text-film-amber transition-colors duration-200">
+                <a href="/admin" class="text-[11.5px] font-medium tracking-[0.18em] uppercase text-film-muted hover:text-film-text transition-colors duration-200">
                   Admin
                 </a>
               )}
               <button
                 id="logout-btn"
-                class="cursor-pointer text-film-muted hover:text-film-amber transition-colors duration-200"
+                class="text-[11.5px] font-medium tracking-[0.18em] uppercase text-film-muted hover:text-film-text transition-colors duration-200 cursor-pointer"
               >
                 Log out
               </button>
             </>
           ) : (
             <>
-              <a href="/login" class="text-film-muted hover:text-film-text transition-colors duration-200">
+              <a href="/login" class="text-[11.5px] font-medium tracking-[0.18em] uppercase text-film-muted hover:text-film-text transition-colors duration-200">
                 Log in
               </a>
               <a
                 href="/register"
-                class="rounded-sm border border-film-amber/60 px-3 py-1.5 text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200"
+                class="text-[11.5px] font-medium tracking-[0.18em] uppercase border border-film-amber text-film-amber px-3.5 py-2 rounded-sm hover:bg-film-amber hover:text-film-bg transition-all duration-200"
               >
                 Register
               </a>
@@ -62,13 +81,28 @@ const isAdmin = user?.role === "admin";
       </div>
     </header>
 
-    <main class="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+    <main class="page mx-auto w-full max-w-[1280px] flex-1 px-8 sm:px-8 px-5 py-10">
       <slot />
     </main>
 
-    <footer class="border-t border-film-border px-6 py-5 text-center text-xs text-film-faint tracking-widest uppercase">
-      &copy; {new Date().getFullYear()} Film Library
+    <footer class="mt-30 border-t border-film-hairline">
+      <div class="mx-auto max-w-[1280px] px-8 sm:px-8 px-5 py-12 flex items-end justify-between gap-6 flex-wrap">
+        <p class="m-0 font-serif italic font-light text-lg text-film-muted max-w-[42ch]">
+          A personal archive of frames exposed slowly, often unevenly, sometimes well.
+        </p>
+        <p class="m-0 text-[11px] tracking-[0.22em] uppercase text-film-faint">
+          &copy; {new Date().getFullYear()} · Film Library · Set in Cormorant &amp; DM Sans
+        </p>
+      </div>
     </footer>
+
+    <style is:global>
+      .nav {
+        backdrop-filter: blur(14px) saturate(140%);
+        -webkit-backdrop-filter: blur(14px) saturate(140%);
+        background: color-mix(in oklab, var(--bg) 78%, transparent);
+      }
+    </style>
 
     {user && (
       <script>
