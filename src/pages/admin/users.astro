@@ -36,7 +36,12 @@ const userRows = users.map((u) => {
     <a href="/admin/groups" class="text-film-muted hover:text-film-amber transition-colors duration-200">Groups</a>
   </nav>
 
-  <h2 class="mb-8 font-serif text-3xl font-light text-film-text">Manage Users</h2>
+  <h2 class="mb-6 font-serif text-3xl font-light text-film-text">Manage Users</h2>
+
+  <div class="mb-4">
+    <input id="admin-search-input" type="search" placeholder="Search users…"
+      class="w-full max-w-xs rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors" />
+  </div>
 
   <div class="space-y-3">
     {userRows.map((u) => (
@@ -47,6 +52,7 @@ const userRows = users.map((u) => {
         data-init-groups={u.groupsJson}
         data-pending-groups={u.groupsJson}
         data-user-name={u.name}
+        data-search={`${u.name} ${u.email}`.toLowerCase()}
       >
         <div class="flex flex-wrap items-center gap-6">
           <div class="min-w-0 flex-1">
@@ -58,11 +64,13 @@ const userRows = users.map((u) => {
             <span class={`verify-badge text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border ${u.emailVerified ? "border-film-amber/40 text-film-amber" : "border-film-border text-film-muted"}`}>
               {u.emailVerified ? "Verified" : "Unverified"}
             </span>
-            {!u.emailVerified && (
-              <button class="activate-btn cursor-pointer text-[10px] tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-150">
-                Activate
-              </button>
-            )}
+            <button
+              class={`activate-btn cursor-pointer text-[10px] tracking-widest uppercase transition-colors duration-150 ${u.emailVerified ? "text-film-muted hover:text-red-400" : "text-film-muted hover:text-film-amber"} ${u.emailVerified && u.id === currentUser.id ? "opacity-40 cursor-not-allowed" : ""}`}
+              data-verified={u.emailVerified ? "1" : "0"}
+              disabled={u.emailVerified && u.id === currentUser.id ? true : undefined}
+            >
+              {u.emailVerified ? "Deactivate" : "Activate"}
+            </button>
           </div>
 
           <div class="flex items-center gap-2">
@@ -190,23 +198,51 @@ const userRows = users.map((u) => {
       }
     });
 
-    // Manual email activation
+    // Activate / deactivate toggle
     document.querySelectorAll(".activate-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const row = (btn as HTMLElement).closest("[data-user-id]") as HTMLElement;
+        const el = btn as HTMLButtonElement;
+        if (el.disabled) return;
+        const row = el.closest("[data-user-id]") as HTMLElement;
         const userId = row.dataset.userId!;
-        (btn as HTMLButtonElement).disabled = true;
-        const res = await post("/api/admin/activate-user", { userId });
+        const currentlyVerified = el.dataset.verified === "1";
+        const nextActive = !currentlyVerified;
+
+        el.disabled = true;
+        const res = await post("/api/admin/activate-user", { userId, active: nextActive });
         if (!res.ok) {
-          (btn as HTMLButtonElement).disabled = false;
+          el.disabled = false;
           const msg = row.querySelector(".save-msg") as HTMLElement;
-          if (msg) { msg.textContent = "Activate failed"; msg.className = "save-msg text-xs text-red-400"; msg.classList.remove("hidden"); setTimeout(() => msg.classList.add("hidden"), 2000); }
+          if (msg) {
+            const data = await res.json().catch(() => ({})) as { error?: string };
+            msg.textContent = data.error ?? (nextActive ? "Activate failed" : "Deactivate failed");
+            msg.className = "save-msg text-xs text-red-400";
+            msg.classList.remove("hidden");
+            setTimeout(() => msg.classList.add("hidden"), 2000);
+          }
           return;
         }
+
         const badge = row.querySelector(".verify-badge") as HTMLElement;
-        if (badge) { badge.textContent = "Verified"; badge.className = "verify-badge text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border border-film-amber/40 text-film-amber"; }
-        btn.remove();
+        if (badge) {
+          badge.textContent = nextActive ? "Verified" : "Unverified";
+          badge.className = `verify-badge text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border ${nextActive ? "border-film-amber/40 text-film-amber" : "border-film-border text-film-muted"}`;
+        }
+        el.textContent = nextActive ? "Deactivate" : "Activate";
+        el.dataset.verified = nextActive ? "1" : "0";
+        el.className = `activate-btn cursor-pointer text-[10px] tracking-widest uppercase transition-colors duration-150 ${nextActive ? "text-film-muted hover:text-red-400" : "text-film-muted hover:text-film-amber"}`;
+        el.disabled = false;
       });
     });
+
+    // Search filter
+    const searchInput = document.getElementById("admin-search-input") as HTMLInputElement | null;
+    if (searchInput) {
+      const items = document.querySelectorAll<HTMLElement>("[data-search]");
+      searchInput.addEventListener("input", () => {
+        const q = searchInput.value.trim().toLowerCase();
+        items.forEach((el) => { el.style.display = !q || (el.dataset.search ?? "").includes(q) ? "" : "none"; });
+      });
+    }
   </script>
 </BaseLayout>

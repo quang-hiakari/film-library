@@ -47,6 +47,11 @@ const rollList = r2Slugs.map((slug: string) => ({
     </div>
   </div>
 
+  <div class="mb-4">
+    <input id="admin-search-input" type="search" placeholder="Search rolls…"
+      class="w-full max-w-xs rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors" />
+  </div>
+
   <div class="overflow-x-auto rounded-sm border border-film-border">
     <table class="w-full text-left text-sm">
       <thead>
@@ -59,7 +64,7 @@ const rollList = r2Slugs.map((slug: string) => ({
       </thead>
       <tbody>
         {rollList.map((roll) => (
-          <tr class="border-b border-film-border last:border-0 hover:bg-film-surface transition-colors duration-150" data-slug={roll.slug}>
+          <tr class="border-b border-film-border last:border-0 hover:bg-film-surface transition-colors duration-150" data-slug={roll.slug} data-search={roll.slug.toLowerCase()}>
             <td class="px-4 py-3">
               <a href={`/admin/rolls/${roll.slug}`} class="text-film-text hover:text-film-amber transition-colors duration-150 font-mono text-xs">
                 {roll.slug}
@@ -113,6 +118,15 @@ const rollList = r2Slugs.map((slug: string) => ({
         setTimeout(() => { el.textContent = "Save"; }, 1500);
       });
     });
+
+    const searchInput = document.getElementById("admin-search-input") as HTMLInputElement | null;
+    if (searchInput) {
+      const items = document.querySelectorAll<HTMLElement>("[data-search]");
+      searchInput.addEventListener("input", () => {
+        const q = searchInput.value.trim().toLowerCase();
+        items.forEach((el) => { el.style.display = !q || (el.dataset.search ?? "").includes(q) ? "" : "none"; });
+      });
+    }
 
     document.getElementById("sync-btn")?.addEventListener("click", async () => {
       const status = document.getElementById("sync-status")!;
