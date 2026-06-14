@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { ne } from "drizzle-orm";
 import { getDb } from "../../../lib/db";
 import { rolls } from "../../../lib/db-schema";
 
@@ -22,6 +23,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     filmStock?: string | null;
     frames?: number | null;
     date?: string | null;
+    showOnHome?: boolean;
   };
   try { body = await request.json(); } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
@@ -48,12 +50,19 @@ export const POST: APIRoute = async ({ locals, request }) => {
   if (body.filmStock !== undefined) set.filmStock = body.filmStock || null;
   if (body.frames !== undefined) set.frames = body.frames ?? null;
   if (body.date !== undefined) set.date = body.date || null;
+  if (body.showOnHome !== undefined) set.showOnHome = body.showOnHome;
 
   if (Object.keys(set).length === 0) {
     return new Response(JSON.stringify({ error: "no fields to update" }), { status: 400 });
   }
 
   const db = getDb(locals.runtime.env.DB);
+
+  // Only one roll can be featured at a time
+  if (body.showOnHome === true) {
+    await db.update(rolls).set({ showOnHome: false }).where(ne(rolls.slug, slug));
+  }
+
   await db
     .insert(rolls)
     .values({ slug, visibility: (body.visibility as "public" | "registered" | "private") ?? "registered", ...set })

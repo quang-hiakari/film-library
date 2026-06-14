@@ -78,6 +78,7 @@ export const rolls = sqliteTable("rolls", {
   frames: integer("frames"),
   date: text("date"),
   createdAt: integer("created_at", { mode: "timestamp" }),
+  showOnHome: integer("show_on_home", { mode: "boolean" }).default(false),
 });
 
 /** Grants a specific user access to a private roll. */

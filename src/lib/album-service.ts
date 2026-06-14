@@ -24,6 +24,7 @@ export interface Album extends AlbumConfig {
   coverUrl: string;
   gated?: boolean;
   createdAt?: Date | null;
+  showOnHome?: boolean;
 }
 
 export interface R2Env {
@@ -133,6 +134,7 @@ export async function getAllAlbums(
       visibility,
       coverUrl: await createSignedUrl(env, coverKey),
       gated: visibility === "registered" && !user,
+      showOnHome: dbRow?.showOnHome ?? false,
       ...(dbRow?.createdAt ? { createdAt: dbRow.createdAt } : {}),
       ...(dbRow?.title?.trim() ? { title: dbRow.title.trim() } : {}),
       ...(dbRow?.description?.trim() ? { description: dbRow.description.trim() } : {}),

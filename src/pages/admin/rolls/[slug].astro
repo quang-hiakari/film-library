@@ -36,13 +36,23 @@ const fallbackTitle = slug
   .replace(/-/g, " ")
   .replace(/\b\w/g, (c) => c.toUpperCase()) || slug;
 
-const photoList = await env.R2.list({ prefix: `rolls/${slug}/` });
+const [photoList, thumbList] = await Promise.all([
+  env.R2.list({ prefix: `rolls/${slug}/` }),
+  env.R2.list({ prefix: `rolls/${slug}/thumbs/` }),
+]);
+const thumbSet = new Set(
+  thumbList.objects.map((o) => o.key.split("/").pop() ?? "").filter(Boolean)
+);
 const photoKeys = photoList.objects
   .map((o) => o.key)
-  .filter((k) => /\.(jpe?g|png|webp)$/i.test(k))
+  .filter((k) => k.split("/").length === 3 && /\.(jpe?g|png|webp)$/i.test(k))
   .sort();
 const photos = await Promise.all(
-  photoKeys.map(async (key) => ({ key, url: await createSignedUrl(env, key) }))
+  photoKeys.map(async (key) => {
+    const filename = key.split("/").pop()!;
+    const displayKey = thumbSet.has(filename) ? `rolls/${slug}/thumbs/${filename}` : key;
+    return { key, url: await createSignedUrl(env, displayKey) };
+  })
 );
 
 const grantedGroupIds = new Set(groupGrants.map((g) => g.id));
@@ -106,6 +116,20 @@ const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
         <span id="info-msg" class="hidden text-xs"></span>
       </div>
     </form>
+  </section>
+
+  <!-- Home Feature -->
+  <section class="mb-10">
+    <h3 class="mb-4 text-xs tracking-widest uppercase text-film-muted">Home Page</h3>
+    <div class="flex items-center gap-4">
+      <label class="flex items-center gap-3 cursor-pointer select-none">
+        <input id="show-on-home" type="checkbox" checked={row?.showOnHome ?? false}
+          class="h-4 w-4 cursor-pointer accent-amber-400" />
+        <span class="text-sm text-film-text">Feature this roll on the home page</span>
+      </label>
+      <span id="home-msg" class="hidden text-xs"></span>
+    </div>
+    <p class="mt-1 text-xs text-film-faint">Only one roll can be featured at a time. Enabling this will unset any other featured roll.</p>
   </section>
 
   <!-- Cover Photo -->
@@ -178,6 +202,12 @@ const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
     async function post(url, body) {
       return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     }
+
+    document.getElementById("show-on-home")?.addEventListener("change", async (e) => {
+      const checked = e.currentTarget.checked;
+      const res = await post("/api/admin/update-roll", { slug, showOnHome: checked });
+      showMsg(document.getElementById("home-msg"), res.ok ? (checked ? "Now featured" : "Removed from home") : "Error", res.ok);
+    });
 
     document.getElementById("info-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
