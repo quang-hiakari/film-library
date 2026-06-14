@@ -1,0 +1,1 @@
+ALTER TABLE `rolls` ADD `created_at` integer;

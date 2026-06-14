@@ -15,11 +15,13 @@ export const POST: APIRoute = async ({ locals, request }) => {
   let body: {
     slug?: string;
     visibility?: string;
+    title?: string | null;
     description?: string | null;
     coverPhotoKey?: string | null;
     camera?: string | null;
     filmStock?: string | null;
     frames?: number | null;
+    date?: string | null;
   };
   try { body = await request.json(); } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
@@ -39,11 +41,13 @@ export const POST: APIRoute = async ({ locals, request }) => {
 
   const set: Record<string, unknown> = {};
   if (body.visibility !== undefined) set.visibility = body.visibility;
+  if (body.title !== undefined) set.title = body.title || null;
   if (body.description !== undefined) set.description = body.description || null;
   if (body.coverPhotoKey !== undefined) set.coverPhotoKey = body.coverPhotoKey;
   if (body.camera !== undefined) set.camera = body.camera || null;
   if (body.filmStock !== undefined) set.filmStock = body.filmStock || null;
   if (body.frames !== undefined) set.frames = body.frames ?? null;
+  if (body.date !== undefined) set.date = body.date || null;
 
   if (Object.keys(set).length === 0) {
     return new Response(JSON.stringify({ error: "no fields to update" }), { status: 400 });

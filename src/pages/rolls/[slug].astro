@@ -89,6 +89,6 @@ const displayDate = new Date(album.date).toLocaleDateString("en-US", {
     <div class="line" />
   </div>
 
-  <PhotoGrid photos={album.photos} totalFrames={album.frames} />
+  <PhotoGrid photos={album.thumbUrls} totalFrames={album.frames} />
   <PhotoLightbox photos={album.photos} title={album.title} stock={album.filmStock} />
 </BaseLayout>

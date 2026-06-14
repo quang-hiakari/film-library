@@ -24,7 +24,7 @@ export const POST: APIRoute = async ({ locals }) => {
   for (const slug of r2Slugs) {
     const result = await db
       .insert(rolls)
-      .values({ slug, visibility: "registered" })
+      .values({ slug, visibility: "registered", createdAt: new Date() })
       .onConflictDoNothing();
     if (result.meta?.changes && result.meta.changes > 0) added++;
   }

@@ -23,6 +23,7 @@ export interface Album extends AlbumConfig {
   visibility: Visibility;
   coverUrl: string;
   gated?: boolean;
+  createdAt?: Date | null;
 }
 
 export interface R2Env {
@@ -67,8 +68,9 @@ async function fetchConfig(r2: R2Bucket, slug: string): Promise<AlbumConfig> {
 async function listPhotoFiles(r2: R2Bucket, slug: string): Promise<string[]> {
   const listing = await r2.list({ prefix: `rolls/${slug}/` });
   return listing.objects
+    // Depth 3 = rolls/{slug}/{file} — excludes thumbs/ subfolder (depth 4)
+    .filter((obj) => obj.key.split("/").length === 3 && !obj.key.endsWith("_config.json"))
     .map((obj) => obj.key.split("/").pop() ?? "")
-    .filter((name) => name && name !== "_config.json")
     .sort();
 }
 
@@ -131,14 +133,22 @@ export async function getAllAlbums(
       visibility,
       coverUrl: await createSignedUrl(env, coverKey),
       gated: visibility === "registered" && !user,
+      ...(dbRow?.createdAt ? { createdAt: dbRow.createdAt } : {}),
+      ...(dbRow?.title?.trim() ? { title: dbRow.title.trim() } : {}),
       ...(dbRow?.description?.trim() ? { description: dbRow.description.trim() } : {}),
       ...(dbRow?.camera ? { camera: dbRow.camera } : {}),
       ...(dbRow?.filmStock ? { filmStock: dbRow.filmStock } : {}),
       ...(dbRow?.frames != null ? { frames: dbRow.frames } : {}),
+      ...(dbRow?.date ? { date: `${dbRow.date}-01` } : {}),
     } as Album);
   }
 
-  return albums.sort((a, b) => b.date.localeCompare(a.date));
+  return albums.sort((a, b) => {
+    if (a.createdAt && b.createdAt) return b.createdAt.getTime() - a.createdAt.getTime();
+    if (a.createdAt) return -1;
+    if (b.createdAt) return 1;
+    return b.date.localeCompare(a.date);
+  });
 }
 
 /** Get a single album with signed photo URLs. Enforces access control. */
@@ -147,7 +157,7 @@ export async function getAlbum(
   db: DB,
   user: AuthUser | null,
   slug: string,
-): Promise<(Album & { photos: string[] }) | null> {
+): Promise<(Album & { photos: string[]; thumbUrls: string[] }) | null> {
   const rollRows = await db.select().from(rollsTable).where(eq(rollsTable.slug, slug)).limit(1);
   const dbRow = rollRows[0];
   const visibility = (dbRow?.visibility ?? "registered") as Visibility;
@@ -166,10 +176,30 @@ export async function getAlbum(
   // Exclude cover.jpg from frame list (dedicated cover file, not a shot)
   const frameFilenames = photoFilenames.filter((f) => f !== "cover.jpg");
 
-  const [coverUrl, ...photos] = await Promise.all([
+  // Check which frames have pre-generated thumbnails
+  const thumbListing = await env.R2.list({ prefix: `rolls/${slug}/thumbs/` });
+  const thumbSet = new Set(
+    thumbListing.objects.map((o) => o.key.split("/").pop() ?? "").filter(Boolean),
+  );
+
+  const [coverUrl, ...fullAndThumbUrls] = await Promise.all([
     createSignedUrl(env, coverKey),
-    ...frameFilenames.map((f) => createSignedUrl(env, `rolls/${slug}/${f}`)),
+    // Interleave: full URL then thumb URL per frame
+    ...frameFilenames.flatMap((f) => [
+      createSignedUrl(env, `rolls/${slug}/${f}`),
+      thumbSet.has(f)
+        ? createSignedUrl(env, `rolls/${slug}/thumbs/${f}`)
+        : createSignedUrl(env, `rolls/${slug}/${f}`), // fallback to full
+    ]),
   ]);
+
+  // De-interleave into photos[] and thumbUrls[]
+  const photos: string[] = [];
+  const thumbUrls: string[] = [];
+  for (let i = 0; i < fullAndThumbUrls.length; i += 2) {
+    photos.push(fullAndThumbUrls[i]);
+    thumbUrls.push(fullAndThumbUrls[i + 1]);
+  }
 
   return {
     ...config,
@@ -177,9 +207,13 @@ export async function getAlbum(
     visibility,
     coverUrl,
     photos,
+    thumbUrls,
+    ...(dbRow?.title?.trim() ? { title: dbRow.title.trim() } : {}),
     ...(dbRow?.description?.trim() ? { description: dbRow.description.trim() } : {}),
     ...(dbRow?.camera ? { camera: dbRow.camera } : {}),
     ...(dbRow?.filmStock ? { filmStock: dbRow.filmStock } : {}),
     ...(dbRow?.frames != null ? { frames: dbRow.frames } : {}),
-  } as Album & { photos: string[] };
+    // date stored as YYYY-MM, padded to YYYY-MM-01 for sort/display consistency
+    ...(dbRow?.date ? { date: `${dbRow.date}-01` } : {}),
+  } as Album & { photos: string[]; thumbUrls: string[] };
 }

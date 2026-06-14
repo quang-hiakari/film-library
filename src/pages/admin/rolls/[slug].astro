@@ -31,6 +31,11 @@ const [rollRow, grants, allGroups, groupGrants] = await Promise.all([
 const row = rollRow[0];
 const visibility = row?.visibility ?? "registered";
 
+const fallbackTitle = slug
+  .replace(/-\d{4}-\d{2}(?:-\d{2})?$/, "")
+  .replace(/-/g, " ")
+  .replace(/\b\w/g, (c) => c.toUpperCase()) || slug;
+
 const photoList = await env.R2.list({ prefix: `rolls/${slug}/` });
 const photoKeys = photoList.objects
   .map((o) => o.key)
@@ -62,7 +67,18 @@ const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
   <section class="mb-10">
     <h3 class="mb-4 text-xs tracking-widest uppercase text-film-muted">Roll Info</h3>
     <form id="info-form" class="space-y-4">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div>
+        <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Title</label>
+        <input name="title" type="text" value={row?.title ?? ""} placeholder={fallbackTitle}
+          class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text focus:border-film-amber/50 focus:outline-none transition-colors" />
+        <p class="mt-1 text-xs text-film-faint">Leave empty to use default: "{fallbackTitle}"</p>
+      </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div>
+          <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Month / Year</label>
+          <input name="date" type="month" value={row?.date ?? ""}
+            class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text focus:border-film-amber/50 focus:outline-none transition-colors" />
+        </div>
         <div>
           <label class="mb-1 block text-xs tracking-widest uppercase text-film-muted">Film Stock</label>
           <input name="filmStock" type="text" value={row?.filmStock ?? ""}
@@ -169,10 +185,12 @@ const availableGroups = allGroups.filter((g) => !grantedGroupIds.has(g.id));
       const framesVal = fd.get("frames");
       const res = await post("/api/admin/update-roll", {
         slug,
+        title: fd.get("title") || null,
         filmStock: fd.get("filmStock") || null,
         camera: fd.get("camera") || null,
         frames: framesVal ? Number(framesVal) : null,
         description: fd.get("description") || null,
+        date: fd.get("date") || null,
       });
       showMsg(document.getElementById("info-msg"), res.ok ? "Saved" : "Error", res.ok);
     });

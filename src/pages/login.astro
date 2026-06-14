@@ -6,9 +6,12 @@ export const prerender = false;
 if (Astro.locals.user) {
   return Astro.redirect("/");
 }
+
+const siteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
 ---
 
 <BaseLayout title="Log in — Film Library">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <div class="mx-auto max-w-sm py-16">
     <h2 class="mb-8 text-center font-serif text-3xl font-light text-film-text">Log in</h2>
 
@@ -24,6 +27,9 @@ if (Astro.locals.user) {
           <input id="password" name="password" type="password" required
             class="w-full rounded-sm border border-film-border bg-film-bg px-3 py-2.5 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors duration-200" />
         </div>
+        {siteKey && (
+          <div class="cf-turnstile" data-sitekey={siteKey} data-theme="dark"></div>
+        )}
         <p id="error" class="hidden text-xs text-red-400"></p>
         <button type="submit"
           class="w-full cursor-pointer rounded-sm border border-film-amber/60 py-2.5 text-sm text-film-amber hover:bg-film-amber hover:text-film-bg transition-all duration-200 tracking-wide">
@@ -48,6 +54,22 @@ if (Astro.locals.user) {
       e.preventDefault();
       errorEl.classList.add("hidden");
       const data = new FormData(form);
+
+      const captchaToken = data.get("cf-turnstile-response") as string | null;
+      if (captchaToken) {
+        const captchaRes = await fetch("/api/verify-captcha", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: captchaToken }),
+        });
+        if (!captchaRes.ok) {
+          errorEl.textContent = "CAPTCHA verification failed. Please try again.";
+          errorEl.classList.remove("hidden");
+          (window as any).turnstile?.reset();
+          return;
+        }
+      }
+
       const { error } = await authClient.signIn.email({
         email: data.get("email") as string,
         password: data.get("password") as string,
@@ -58,6 +80,7 @@ if (Astro.locals.user) {
           ? "Email not yet verified. Please check your inbox for the activation link."
           : (error.message ?? "Invalid email or password");
         errorEl.classList.remove("hidden");
+        (window as any).turnstile?.reset();
         return;
       }
       window.location.href = "/";

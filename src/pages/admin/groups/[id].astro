@@ -1,0 +1,147 @@
+---
+import BaseLayout from "../../../layouts/base-layout.astro";
+import { getDb } from "../../../lib/db";
+import { user as userTable, groups, userGroups } from "../../../lib/db-schema";
+import { eq } from "drizzle-orm";
+
+export const prerender = false;
+
+const currentUser = Astro.locals.user;
+if (!currentUser || currentUser.role !== "admin") return Astro.redirect("/");
+
+const groupId = Astro.params.id;
+if (!groupId) return Astro.redirect("/admin/groups");
+
+const db = getDb(Astro.locals.runtime.env.DB);
+
+const [group] = await db
+  .select({ id: groups.id, name: groups.name })
+  .from(groups)
+  .where(eq(groups.id, groupId))
+  .limit(1);
+
+if (!group) return new Response("Group not found", { status: 404 });
+
+const [users, memberships] = await Promise.all([
+  db.select({ id: userTable.id, name: userTable.name, email: userTable.email, role: userTable.role })
+    .from(userTable).orderBy(userTable.name),
+  db.select({ userId: userGroups.userId }).from(userGroups).where(eq(userGroups.groupId, groupId)),
+]);
+
+const memberSet = new Set(memberships.map((m) => m.userId));
+const userRows = users.map((u) => ({ ...u, isMember: memberSet.has(u.id) }));
+const memberCount = memberSet.size;
+---
+
+<BaseLayout title={`${group.name} — Group`}>
+  <nav class="mb-8 flex items-center gap-6 text-xs tracking-widest uppercase">
+    <a href="/admin" class="text-film-muted hover:text-film-amber transition-colors duration-200">Rolls</a>
+    <a href="/admin/users" class="text-film-muted hover:text-film-amber transition-colors duration-200">Users</a>
+    <a href="/admin/groups" class="text-film-amber">Groups</a>
+  </nav>
+
+  <a href="/admin/groups" class="mb-4 inline-block text-xs tracking-widest uppercase text-film-muted hover:text-film-amber transition-colors duration-200">
+    &larr; Back to groups
+  </a>
+
+  <h2 class="mb-2 font-serif text-3xl font-light text-film-text">{group.name}</h2>
+  <p class="mb-8 text-xs tracking-widest uppercase text-film-muted">
+    <span id="member-count">{memberCount}</span> members &middot; {users.length} users total
+  </p>
+
+  <div class="mb-4">
+    <input id="admin-search-input" type="search" placeholder="Search users…"
+      class="w-full max-w-xs rounded-sm border border-film-border bg-film-bg px-3 py-2 text-sm text-film-text placeholder-film-faint focus:border-film-amber/50 focus:outline-none transition-colors" />
+  </div>
+
+  {userRows.length > 0 ? (
+    <div class="space-y-3" data-group-id={group.id}>
+      {userRows.map((u) => (
+        <div
+          class="rounded-sm border border-film-border bg-film-surface px-5 py-4"
+          data-user-id={u.id}
+          data-member={u.isMember ? "1" : "0"}
+          data-search={`${u.name} ${u.email}`.toLowerCase()}
+        >
+          <div class="flex flex-wrap items-center gap-6">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-film-text">{u.name}</p>
+              <p class="text-xs text-film-muted">{u.email}</p>
+            </div>
+
+            <span class={`text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border ${u.role === "admin" ? "border-film-amber/40 text-film-amber" : "border-film-border text-film-muted"}`}>
+              {u.role}
+            </span>
+
+            <span class={`member-badge text-[10px] tracking-widest uppercase px-2 py-0.5 rounded-sm border border-film-amber/40 text-film-amber ${u.isMember ? "" : "hidden"}`}>
+              Member
+            </span>
+
+            <div class="flex items-center gap-3">
+              <button class={`toggle-btn cursor-pointer text-xs tracking-widest uppercase transition-colors duration-150 ${u.isMember ? "text-film-muted hover:text-red-400" : "text-film-muted hover:text-film-amber"}`}>
+                {u.isMember ? "Remove" : "Add"}
+              </button>
+              <span class="toggle-msg hidden text-xs"></span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p class="font-serif text-xl italic text-film-faint">No users yet.</p>
+  )}
+
+  <script>
+    async function post(url: string, body: object) {
+      return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    }
+
+    const list = document.querySelector<HTMLElement>("[data-group-id]");
+    const groupId = list?.dataset.groupId ?? "";
+    const memberCountEl = document.getElementById("member-count");
+
+    document.querySelectorAll<HTMLButtonElement>(".toggle-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const row = btn.closest("[data-user-id]") as HTMLElement;
+        if (!row) return;
+        const userId = row.dataset.userId!;
+        const isMember = row.dataset.member === "1";
+        const msg = row.querySelector(".toggle-msg") as HTMLElement;
+        const badge = row.querySelector(".member-badge") as HTMLElement;
+
+        btn.disabled = true;
+        const res = await post("/api/admin/user-groups", { action: isMember ? "remove" : "add", userId, groupId });
+        btn.disabled = false;
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          msg.textContent = data.error ?? "Failed";
+          msg.className = "toggle-msg text-xs text-red-400";
+          msg.classList.remove("hidden");
+          setTimeout(() => msg.classList.add("hidden"), 2000);
+          return;
+        }
+
+        const nextMember = !isMember;
+        row.dataset.member = nextMember ? "1" : "0";
+        badge.classList.toggle("hidden", !nextMember);
+        btn.textContent = nextMember ? "Remove" : "Add";
+        btn.className = `toggle-btn cursor-pointer text-xs tracking-widest uppercase transition-colors duration-150 ${nextMember ? "text-film-muted hover:text-red-400" : "text-film-muted hover:text-film-amber"}`;
+
+        if (memberCountEl) {
+          const current = parseInt(memberCountEl.textContent ?? "0", 10) || 0;
+          memberCountEl.textContent = String(nextMember ? current + 1 : Math.max(0, current - 1));
+        }
+      });
+    });
+
+    const searchInput = document.getElementById("admin-search-input") as HTMLInputElement | null;
+    if (searchInput) {
+      const items = document.querySelectorAll<HTMLElement>("[data-search]");
+      searchInput.addEventListener("input", () => {
+        const q = searchInput.value.trim().toLowerCase();
+        items.forEach((el) => { el.style.display = !q || (el.dataset.search ?? "").includes(q) ? "" : "none"; });
+      });
+    }
+  </script>
+</BaseLayout>

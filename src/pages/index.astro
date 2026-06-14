@@ -24,8 +24,14 @@ if (env?.R2 && env?.DB) {
   fetchError = true;
 }
 
-// Most recent roll = featured hero
-const featured = albums[0];
+// Featured hero = newest created roll visible to current user
+// getAllAlbums already enforces access control, so no extra visibility filter needed
+const featured = [...albums].sort((a, b) => {
+  if (a.createdAt && b.createdAt) return b.createdAt.getTime() - a.createdAt.getTime();
+  if (a.createdAt) return -1;
+  if (b.createdAt) return 1;
+  return b.date.localeCompare(a.date);
+})[0];
 const indexAlbums = albums; // include featured in the index too
 
 // Number rolls in reverse-chronological order (most recent = highest number)
